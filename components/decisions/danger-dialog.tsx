@@ -1,0 +1,169 @@
+"use client";
+
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { AlertTriangle, X } from "lucide-react";
+import type { DangerAlert } from "@/app/api/decisions/pre-check/route";
+
+type Props = {
+  open: boolean;
+  alerts: DangerAlert[];
+  onConfirm: () => void;
+  onCancel: () => void;
+  onWatchlist?: () => void;
+  isSubmitting?: boolean;
+};
+
+export function DangerDialog({
+  open,
+  alerts,
+  onConfirm,
+  onCancel,
+  onWatchlist,
+  isSubmitting = false,
+}: Props) {
+  // 平静度≤4 时额外提供"先观察"出口
+  const hasCalmAlert = alerts.some((a) => a.signal === "CALM_LOW");
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+    >
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Backdrop
+          className="fixed inset-0 z-50 bg-black/50 supports-backdrop-filter:backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        />
+        <DialogPrimitive.Popup
+          className="fixed top-1/2 left-1/2 z-50 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+          style={{
+            backgroundColor: "var(--surface-card)",
+            border: "1px solid var(--border-strong)",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+          }}
+        >
+          {/* Header */}
+          <div
+            className="flex items-center gap-2.5 px-5 py-4 border-b"
+            style={{ borderColor: "var(--border-subtle)" }}
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+              style={{ backgroundColor: "rgba(245,158,11,0.15)" }}
+            >
+              <AlertTriangle size={16} style={{ color: "var(--brand-warning)" }} />
+            </div>
+            <div className="flex-1">
+              <DialogPrimitive.Title
+                className="text-sm font-semibold"
+                style={{ color: "var(--foreground)" }}
+              >
+                等等。检测到 {alerts.length} 个危险信号
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description
+                className="text-[11px] mt-0.5"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                看完你自己的历史数据，再决定是否继续
+              </DialogPrimitive.Description>
+            </div>
+            <DialogPrimitive.Close
+              className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-white/5"
+              style={{ color: "var(--muted-foreground)" }}
+              aria-label="关闭"
+            >
+              <X size={14} />
+            </DialogPrimitive.Close>
+          </div>
+
+          {/* Alerts list */}
+          <div
+            className="px-5 py-3 space-y-2.5 max-h-[55vh] overflow-y-auto"
+          >
+            {alerts.map((a) => (
+              <div
+                key={a.signal}
+                className="rounded-lg px-3 py-2.5"
+                style={{
+                  backgroundColor: "rgba(245,158,11,0.06)",
+                  border: "1px solid rgba(245,158,11,0.2)",
+                }}
+              >
+                <div
+                  className="text-xs font-semibold mb-1"
+                  style={{ color: "var(--brand-warning)" }}
+                >
+                  {a.title}
+                </div>
+                <div
+                  className="text-xs leading-relaxed mb-1.5"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  {a.message}
+                </div>
+                {a.history && (
+                  <div
+                    className="text-[11px] leading-relaxed"
+                    style={{ color: "var(--muted-foreground)" }}
+                  >
+                    {a.history}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div
+            className="px-5 py-3 border-t space-y-2"
+            style={{ borderColor: "var(--border-subtle)" }}
+          >
+            {/* 平静度≤4 专属：先观察出口 */}
+            {hasCalmAlert && onWatchlist && (
+              <button
+                type="button"
+                onClick={onWatchlist}
+                disabled={isSubmitting}
+                className="w-full h-9 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                style={{
+                  backgroundColor: "rgba(61,142,248,0.12)",
+                  color: "var(--brand-blue)",
+                  border: "1px solid rgba(61,142,248,0.3)",
+                }}
+              >
+                先观察，明天再决定 →
+              </button>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isSubmitting}
+                className="flex-1 h-9 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                style={{
+                  backgroundColor: "var(--surface-overlay)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                取消，再想想
+              </button>
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={isSubmitting}
+                className="flex-1 h-9 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                style={{
+                  backgroundColor: "var(--brand-warning)",
+                  color: "#0D1117",
+                }}
+              >
+                {isSubmitting ? "提交中…" : "我知道了，继续"}
+              </button>
+            </div>
+          </div>
+        </DialogPrimitive.Popup>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}

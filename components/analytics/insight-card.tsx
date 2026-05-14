@@ -45,8 +45,7 @@ export function InsightCard() {
 
   return (
     <div
-      className="rounded-xl border p-5 space-y-4"
-      style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)" }}
+      className="card-surface rounded-xl border p-5 space-y-4"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -132,16 +131,23 @@ export function InsightCard() {
 
       {error && (
         <div
-          className="rounded-lg px-4 py-3 text-sm"
+          className="rounded-lg px-4 py-3 text-sm flex flex-col gap-2"
           style={{
-            backgroundColor: "rgba(239,68,68,0.08)",
-            color: "var(--brand-red)",
-            border: "1px solid rgba(239,68,68,0.2)",
+            backgroundColor: error.includes("DEEPSEEK_API_KEY") ? "rgba(139,92,246,0.08)" : "rgba(239,68,68,0.08)",
+            color: error.includes("DEEPSEEK_API_KEY") ? "var(--brand-purple)" : "var(--brand-red)",
+            border: `1px solid ${error.includes("DEEPSEEK_API_KEY") ? "rgba(139,92,246,0.2)" : "rgba(239,68,68,0.2)"}`,
           }}
         >
-          {error}
+          <div className="font-medium">{error}</div>
+          {error.includes("DEEPSEEK_API_KEY") && (
+            <p className="text-[11px] opacity-80 leading-relaxed">
+              请在环境变量中配置 <code className="bg-black/20 px-1 rounded">DEEPSEEK_API_KEY</code> 以启用 AI 深度复盘功能。
+              如果您在本地运行，请在 <code className="bg-black/20 px-1 rounded">.env.local</code> 中添加该配置。
+            </p>
+          )}
         </div>
       )}
+
     </div>
   );
 }

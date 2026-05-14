@@ -20,7 +20,7 @@ export default async function NewDecisionPage() {
   const blocked = review !== null && review.status === "DRAFT";
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6">
+    <div className="px-4 py-6">
       <Link
         href="/decisions"
         className="inline-flex items-center gap-1 text-xs mb-6 transition-colors"
@@ -36,10 +36,10 @@ export default async function NewDecisionPage() {
           style={{ backgroundColor: "var(--surface-card)", borderColor: "rgba(245,158,11,0.4)" }}
         >
           <div
-            className="w-12 h-12 rounded-full flex items-center justify-center mx-auto"
+            className="w-12 h-12 rounded-full flex items-center justify-center"
             style={{ backgroundColor: "rgba(245,158,11,0.12)" }}
           >
-            <span className="text-2xl">🔒</span>
+            <Lock className="text-muted-foreground/40" size={32} />
           </div>
           <div>
             <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>

@@ -32,7 +32,7 @@ export default async function HoldingDetailPage({ params }: Props) {
   const marketValue = (holding.currentPrice ?? holding.costPrice) * holding.shares;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+    <div className="px-4 py-6 space-y-5">
       <Link
         href="/holdings"
         className="inline-flex items-center gap-1 text-xs transition-colors"
@@ -83,7 +83,7 @@ export default async function HoldingDetailPage({ params }: Props) {
             {pnlPct !== null && (
               <span
                 className="text-base font-bold"
-                style={{ color: pnlPct >= 0 ? "var(--brand-red)" : "var(--brand-green)" }}
+                style={{ color: pnlPct >= 0 ? "var(--color-up)" : "var(--color-down)" }}
               >
                 {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
               </span>

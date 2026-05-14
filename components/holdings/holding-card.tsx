@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 import type { Holding } from "@/types/holding";
 import { STATUS_LABELS, STATUS_COLORS } from "@/types/holding";
 
@@ -71,7 +72,7 @@ export function HoldingCard({ holding: h }: Props) {
             <span
               className="text-xs font-bold tabular-nums"
               style={{
-                color: pnlPct >= 0 ? "var(--brand-red)" : "var(--brand-green)",
+                color: pnlPct >= 0 ? "var(--color-up)" : "var(--color-down)",
               }}
             >
               {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
@@ -132,7 +133,11 @@ export function HoldingCard({ holding: h }: Props) {
           className="ml-auto font-medium"
           style={{ color: h.exitConditions.length === 0 ? "var(--brand-warning)" : "var(--muted-foreground)" }}
         >
-          {h.exitConditions.length === 0 ? "⚠ 无止损" : ""}
+          {h.exitConditions.length === 0 ? (
+            <span className="flex items-center gap-1">
+              <AlertTriangle size={10} /> 无止损
+            </span>
+          ) : ""}
         </span>
       </div>
     </Link>

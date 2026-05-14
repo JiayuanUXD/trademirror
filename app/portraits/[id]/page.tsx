@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, AlertTriangle, Target } from "lucide-react";
 import { getPortraitById } from "@/lib/db/queries/portraits";
 import { PortraitForm } from "@/components/portraits/portrait-form";
 import { PROBLEM_DEFINITIONS } from "@/types/portrait";
@@ -47,7 +47,7 @@ export default async function PortraitDetailPage({ params }: Props) {
     : "var(--brand-green)";
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="px-4 py-6 space-y-6">
       <div>
         <Link
           href="/portraits"
@@ -119,7 +119,7 @@ export default async function PortraitDetailPage({ params }: Props) {
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
               style={{ backgroundColor: "rgba(245,158,11,0.08)", color: "var(--brand-warning)", border: "1px solid rgba(245,158,11,0.2)" }}
             >
-              ⚠ 本月共 {portrait.emotionalCount} 笔情绪化交易（FOMO≥7 或平静度≤4）
+              <AlertTriangle size={14} /> 本月共 {portrait.emotionalCount} 笔情绪化交易（FOMO≥7 或平静度≤4）
             </div>
           )}
         </div>
@@ -138,7 +138,7 @@ export default async function PortraitDetailPage({ params }: Props) {
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium"
             style={{ backgroundColor: "rgba(61,142,248,0.12)", color: "var(--brand-blue)" }}
           >
-            🎯 {PROBLEM_DEFINITIONS[portrait.nextFocus]?.label}
+            <Target size={14} /> {PROBLEM_DEFINITIONS[portrait.nextFocus]?.label}
           </div>
         </div>
       )}

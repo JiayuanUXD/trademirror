@@ -14,7 +14,7 @@ export default async function AlertsPage() {
   const alerts = computeAlerts(decisions, holdings);
 
   return (
-    <div className="px-4 py-5 sm:px-6 sm:py-6 max-w-2xl mx-auto space-y-6">
+    <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       {/* 页头 */}
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>

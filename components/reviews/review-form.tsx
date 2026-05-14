@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { FileEdit, BarChart3, CheckCircle } from "lucide-react";
 import { DisciplineScorer } from "./discipline-scorer";
 import type { WeeklyReview, DisciplineItem } from "@/types/review";
 
@@ -75,7 +76,9 @@ export function ReviewForm({ review: initial }: Props) {
     <div className={`space-y-6 ${isPending ? "opacity-70 pointer-events-none" : ""}`}>
       {/* Three questions */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>📝 三问必填</h2>
+        <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <FileEdit size={16} className="text-brand-blue" /> 三问必填
+        </h2>
         {QUESTIONS.map(({ key, label, placeholder }) => (
           <div key={key} className="space-y-1.5">
             <label className="text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>
@@ -108,7 +111,9 @@ export function ReviewForm({ review: initial }: Props) {
 
       {/* Discipline scorer */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>📊 纪律打分（共7项，满分14）</h2>
+        <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <BarChart3 size={16} className="text-brand-purple" /> 纪律打分（共7项，满分14）
+        </h2>
         <DisciplineScorer
           items={review.disciplineItems}
           onChange={handleDisciplineChange}
@@ -128,7 +133,9 @@ export function ReviewForm({ review: initial }: Props) {
             className="w-full h-10 rounded-lg text-sm font-medium text-white transition-colors"
             style={{ backgroundColor: "var(--brand-blue)" }}
           >
-            ✅ 完成本周复盘
+            <span className="flex items-center justify-center gap-1.5">
+              <CheckCircle size={16} /> 完成本周复盘
+            </span>
           </button>
           <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
             完成后三问将锁定，纪律分仍可修改
@@ -141,7 +148,7 @@ export function ReviewForm({ review: initial }: Props) {
           className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm"
           style={{ backgroundColor: "rgba(34,197,94,0.08)", color: "var(--brand-green)", border: "1px solid rgba(34,197,94,0.2)" }}
         >
-          ✅ 本周复盘已完成
+          <CheckCircle size={16} /> 本周复盘已完成
         </div>
       )}
     </div>

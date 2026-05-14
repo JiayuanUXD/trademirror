@@ -106,3 +106,12 @@ export const decisions = sqliteTable("decisions", {
   isArchived: integer("is_archived", { mode: "boolean" }).default(false).notNull(),
   createdAt: integer("created_at").notNull(),
 });
+
+export const settings = sqliteTable("settings", {
+  id: text("id").primaryKey(),
+  displayName: text("display_name").notNull().default(""),
+  maxPositionPct: integer("max_position_pct").notNull().default(25),
+  weeklyTradeLimit: integer("weekly_trade_limit").notNull().default(2),
+  defaultStopLossPct: integer("default_stop_loss_pct").notNull().default(10),
+  totalCapital: real("total_capital").notNull().default(0),
+});

@@ -4,7 +4,7 @@ import { HoldingForm } from "@/components/holdings/holding-form";
 
 export default function NewHoldingPage() {
   return (
-    <div className="max-w-lg mx-auto px-4 py-6">
+    <div className="px-4 py-6">
       <Link
         href="/holdings"
         className="inline-flex items-center gap-1 text-xs mb-6 transition-colors"

@@ -56,12 +56,11 @@ function ChartCard({
 }) {
   return (
     <div
-      className="rounded-xl border p-4"
-      style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)" }}
+      className="card-surface rounded-xl border p-5"
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{title}</h3>
-        {hint && <span className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>{hint}</span>}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{title}</h3>
+        {hint && <span className="text-[10px] opacity-60" style={{ color: "var(--muted-foreground)" }}>{hint}</span>}
       </div>
       <div style={{ width: "100%", height, position: "relative" }}>{children}</div>
     </div>
@@ -70,7 +69,7 @@ function ChartCard({
 
 function Skeleton({ height }: { height: number }) {
   return (
-    <div className="rounded-xl border p-4" style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
+    <div className="card-surface rounded-xl border p-5">
       <div
         className="rounded-lg animate-pulse"
         style={{ height, backgroundColor: "var(--surface-overlay)" }}

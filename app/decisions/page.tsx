@@ -7,11 +7,11 @@ import dayjs from "dayjs";
 export const dynamic = "force-dynamic";
 
 const ACTION_COLORS: Record<DecisionAction, string> = {
-  BUY:    "var(--brand-red)",
-  ADD:    "var(--brand-red)",
-  SELL:   "var(--brand-green)",
-  REDUCE: "var(--brand-green)",
-  CLEAR:  "var(--brand-green)",
+  BUY:    "var(--color-up)",
+  ADD:    "var(--color-up)",
+  SELL:   "var(--color-down)",
+  REDUCE: "var(--color-down)",
+  CLEAR:  "var(--color-down)",
 };
 
 const ACTION_ICONS: Record<DecisionAction, React.ReactNode> = {
@@ -26,7 +26,7 @@ export default async function DecisionsPage() {
   const decisions = await getDecisions();
 
   return (
-    <div className="px-4 py-5 sm:px-6 sm:py-6 max-w-4xl mx-auto space-y-5">
+    <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -146,7 +146,7 @@ export default async function DecisionsPage() {
                       <span
                         className="text-xs font-bold tabular-nums"
                         style={{
-                          color: (d.return30Days ?? 0) >= 0 ? "var(--brand-red)" : "var(--brand-green)",
+                          color: (d.return30Days ?? 0) >= 0 ? "var(--color-up)" : "var(--color-down)",
                         }}
                       >
                         {(d.return30Days ?? 0) >= 0 ? "+" : ""}

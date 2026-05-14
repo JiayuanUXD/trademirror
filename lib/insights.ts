@@ -153,7 +153,7 @@ export function buildPrompt(ctx: InsightContext): string {
   if (d.recentList.length > 0) {
     lines.push(``, `【最近操作摘要】`);
     for (const op of d.recentList.slice(0, 5)) {
-      const danger = op.danger.length > 0 ? ` ⚠${op.danger.join("/")}` : "";
+      const danger = op.danger.length > 0 ? ` [!]${op.danger.join("/")}` : "";
       lines.push(`- ${ACTION_ZH[op.action] ?? op.action} ${op.stock}：${op.reason}（FOMO=${op.fomo}${danger}）`);
     }
   }

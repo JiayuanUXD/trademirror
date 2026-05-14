@@ -103,6 +103,14 @@ const DDL = [
     cost REAL,
     occurred_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS settings (
+    id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL DEFAULT '',
+    max_position_pct INTEGER NOT NULL DEFAULT 25,
+    weekly_trade_limit INTEGER NOT NULL DEFAULT 2,
+    default_stop_loss_pct INTEGER NOT NULL DEFAULT 10,
+    total_capital REAL NOT NULL DEFAULT 0
+  )`,
   // Indexes
   `CREATE INDEX IF NOT EXISTS idx_error_logs_type ON error_logs(error_type_id)`,
   `CREATE INDEX IF NOT EXISTS idx_error_logs_decision ON error_logs(decision_id)`,

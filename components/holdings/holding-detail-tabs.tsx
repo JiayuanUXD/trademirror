@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Trash2, CheckSquare, Square } from "lucide-react";
+import { Plus, Trash2, CheckSquare, Square, AlertTriangle } from "lucide-react";
 import type { Holding, LogicReason, Prerequisite, ExitCondition, ExitConditionType } from "@/types/holding";
 import { EXIT_CONDITION_LABELS } from "@/types/holding";
 import type { Decision } from "@/types/decision";
@@ -281,7 +281,7 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
             <div
               key={c.id}
               className="flex items-start gap-2 rounded-lg border p-3"
-              style={{ ...cardStyle, borderColor: c.triggered ? "var(--brand-red)" : "var(--border-subtle)" }}
+              style={{ ...cardStyle, borderColor: c.triggered ? "var(--color-down)" : "var(--border-subtle)" }}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -292,7 +292,9 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
                     {EXIT_CONDITION_LABELS[c.type]}
                   </span>
                   {c.triggered && (
-                    <span className="text-[10px]" style={{ color: "var(--brand-red)" }}>⚠ 已触发</span>
+                    <span className="text-[10px] flex items-center gap-1" style={{ color: "var(--color-down)" }}>
+                      <AlertTriangle size={10} /> 已触发
+                    </span>
                   )}
                 </div>
                 <p className="text-sm mt-1" style={{ color: "var(--foreground)" }}>{c.description}</p>
@@ -308,8 +310,8 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
                   onClick={() => triggerExitCondition(c.id)}
                   className="text-[11px] px-2 py-1 rounded transition-colors"
                   style={{
-                    backgroundColor: c.triggered ? "rgba(239,68,68,0.15)" : "var(--surface-card)",
-                    color: c.triggered ? "var(--brand-red)" : "var(--muted-foreground)",
+                    backgroundColor: c.triggered ? "rgba(34,197,94,0.15)" : "var(--surface-card)",
+                    color: c.triggered ? "var(--color-down)" : "var(--muted-foreground)",
                   }}
                 >
                   {c.triggered ? "撤销" : "触发"}
@@ -379,7 +381,7 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
 
           {decisions.map((d) => {
             const isBuy = d.action === "BUY" || d.action === "ADD";
-            const actionColor = isBuy ? "var(--brand-red)" : "var(--brand-green)";
+            const actionColor = isBuy ? "var(--color-up)" : "var(--color-down)";
             return (
               <div
                 key={d.id}
@@ -398,7 +400,9 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
                     <span>¥{d.price} × {d.quantity}股</span>
                     <span>F:{d.fomoScore} C:{d.calmScore}</span>
                     {d.dangerSignals.length > 0 && (
-                      <span style={{ color: "var(--brand-warning)" }}>⚠ {d.dangerSignals.join(", ")}</span>
+                      <span className="flex items-center gap-1" style={{ color: "var(--brand-warning)" }}>
+                        <AlertTriangle size={10} /> {d.dangerSignals.join(", ")}
+                      </span>
                     )}
                   </div>
                 </div>

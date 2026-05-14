@@ -11,7 +11,7 @@ export default async function HoldingsPage() {
   const closed = holdings.filter((h) => h.status === "CLOSED");
 
   return (
-    <div className="px-4 py-5 sm:px-6 sm:py-6 max-w-4xl mx-auto space-y-6">
+    <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>持仓库</h1>

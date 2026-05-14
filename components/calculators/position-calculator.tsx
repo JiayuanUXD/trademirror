@@ -8,7 +8,7 @@ function Row({ label, value, highlight }: { label: string; value: string; highli
       style={{ borderColor: "var(--border-subtle)" }}>
       <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{label}</span>
       <span className="text-sm font-semibold"
-        style={{ color: highlight ? "var(--brand-green)" : "var(--foreground)" }}>{value}</span>
+        style={{ color: highlight ? "var(--color-up)" : "var(--foreground)" }}>{value}</span>
     </div>
   );
 }
@@ -77,9 +77,9 @@ export function PositionCalculator() {
           <Row label="占总仓位" value={`${positionPct.toFixed(1)}%`}
             highlight={positionPct <= 25} />
           {positionPct > 25 && (
-            <p className="text-xs mt-2" style={{ color: "var(--brand-warning)" }}>
-              ⚠ 该仓位超过 25%，建议调高止损价或降低最大亏损比例
-            </p>
+              <p className="text-xs mt-2 flex items-center gap-1" style={{ color: "var(--brand-warning)" }}>
+                <AlertTriangle size={12} /> 该仓位超过 25%，建议调高止损价或降低最大亏损比例
+              </p>
           )}
         </div>
       ) : (

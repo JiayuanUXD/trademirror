@@ -19,7 +19,7 @@ export default async function ReviewsPage() {
   const allReviews = await getReviews();
 
   return (
-    <div className="px-4 py-5 sm:px-6 sm:py-6 max-w-4xl mx-auto space-y-6">
+    <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>复盘</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -47,13 +47,13 @@ export default async function ReviewsPage() {
               </span>
             </div>
             <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
-              {currentReview.status === "COMPLETED" ? "本周复盘已完成 ✅" : "本周复盘待完成"}
+              {currentReview.status === "COMPLETED" ? "本周复盘已完成" : "本周复盘待完成"}
             </h2>
             <div className="flex gap-4 mt-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
               <span>操作 {currentReview.weekDecisionCount} 笔</span>
               {currentReview.dangerTradeCount > 0 && (
-                <span style={{ color: "var(--brand-warning)" }}>
-                  ⚠ 高危 {currentReview.dangerTradeCount} 笔
+                <span className="flex items-center gap-1" style={{ color: "var(--brand-warning)" }}>
+                  <AlertTriangle size={12} /> 高危 {currentReview.dangerTradeCount} 笔
                 </span>
               )}
               <span>纪律 {currentReview.disciplineTotal}/14</span>

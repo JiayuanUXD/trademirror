@@ -40,7 +40,7 @@ export default async function ErrorsPage() {
   const totalCost = types.reduce((s, t) => s + (t.totalCost ?? 0), 0);
 
   return (
-    <div className="px-4 py-5 sm:px-6 sm:py-6 max-w-4xl mx-auto space-y-6">
+    <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>

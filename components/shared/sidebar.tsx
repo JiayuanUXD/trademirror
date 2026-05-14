@@ -3,17 +3,14 @@
 import {
   LayoutDashboard,
   FileText,
-  BarChart3,
   TrendingUp,
   CalendarDays,
+  Calendar,
   BookOpen,
   AlertCircle,
   Calculator,
   Target,
   Settings,
-  ChevronRight,
-  Plus,
-  MessageSquare,
   Bell,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,18 +22,18 @@ type NavItem = {
   href: string;
   icon: React.ReactNode;
   badge?: "Pro";
-  children?: { label: string; href: string }[];
 };
 
 const navItems: NavItem[] = [
   {
     label: "仪表板",
-    href: "/dashboard",
+    href: "/",
     icon: <LayoutDashboard size={15} />,
-    children: [
-      { label: "概览", href: "/dashboard" },
-      { label: "日历", href: "/dashboard/calendar" },
-    ],
+  },
+  {
+    label: "回顾日历",
+    href: "/calendar",
+    icon: <Calendar size={15} />,
   },
   {
     label: "决策卡",
@@ -52,11 +49,6 @@ const navItems: NavItem[] = [
     label: "复盘",
     href: "/reviews",
     icon: <CalendarDays size={15} />,
-  },
-  {
-    label: "分析",
-    href: "/analytics",
-    icon: <BarChart3 size={15} />,
   },
   {
     label: "月度画像",
@@ -95,11 +87,20 @@ export function Sidebar() {
   const [alertHighCount, setAlertHighCount] = useState(0);
 
   useEffect(() => {
-    fetch("/api/alerts")
-      .then((r) => r.json())
-      .then((data: { highCount: number }) => setAlertHighCount(data.highCount))
-      .catch(() => {});
+    const eventSource = new EventSource("/api/alerts/sse");
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setAlertHighCount(data.highCount);
+      } catch (e) {
+        console.error("SSE parse error", e);
+      }
+    };
+
+    return () => eventSource.close();
   }, []);
+
 
   return (
     <aside
@@ -110,13 +111,12 @@ export function Sidebar() {
       }}
     >
       {/* Nav */}
-      <nav className="flex-1 py-3 overflow-y-auto px-1.5 md:px-2 space-y-0.5">
+      <nav className="flex-1 py-3 overflow-y-auto px-1.5 md:px-2 space-y-1">
         {navItems.map((item) => {
           const isActive =
             item.href === "/"
               ? pathname === "/"
               : pathname === item.href || pathname.startsWith(item.href + "/");
-          const hasChildren = !!item.children;
           const isAlertsItem = item.href === "/alerts";
 
           return (
@@ -124,9 +124,9 @@ export function Sidebar() {
               <Link
                 href={item.href}
                 title={item.label}
-                className={`relative flex items-center gap-2.5 px-2.5 md:px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
+                className={`nav-item relative flex items-center gap-2.5 px-2.5 md:px-3 py-2 rounded-lg text-sm ${
                   isActive
-                    ? "bg-[var(--sidebar-accent)] text-[var(--foreground)]"
+                    ? "bg-[var(--sidebar-accent)] text-[var(--foreground)] shadow-[0_0_0_1px_rgba(61,142,248,0.2)]"
                     : "text-[var(--muted-foreground)] hover:bg-white/[0.05] hover:text-[var(--foreground)]"
                 }`}
               >
@@ -167,53 +167,17 @@ export function Sidebar() {
                     />
                   </>
                 )}
-                {hasChildren && (
-                  <ChevronRight size={11} className="hidden md:block opacity-40 shrink-0" />
-                )}
               </Link>
-
-              {/* Inline sub-items (active parent only, desktop only) */}
-              {hasChildren && isActive && (
-                <div
-                  className="hidden md:block ml-5 pl-3 my-1 space-y-0.5"
-                  style={{ borderLeft: "1px solid var(--border-subtle)" }}
-                >
-                  {item.children!.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className="flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-all hover:text-[var(--foreground)] hover:bg-white/[0.04]"
-                      style={{ color: "var(--muted-foreground)" }}
-                    >
-                      <span className="w-1 h-1 rounded-full bg-current opacity-50 shrink-0" />
-                      {child.label}
-                    </Link>
-                  ))}
-                  <Link
-                    href="/decisions/new"
-                    className="flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-all hover:text-[var(--foreground)] hover:bg-white/[0.04]"
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    <Plus size={10} />
-                    新建
-                  </Link>
-                </div>
-              )}
             </div>
           );
         })}
       </nav>
 
-      {/* Footer CTA — desktop only */}
-      <div className="hidden md:block p-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-        <a
-          href="#"
-          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all hover:bg-white/[0.04]"
-          style={{ backgroundColor: "rgba(88,101,242,0.12)", color: "#818CF8" }}
-        >
-          <MessageSquare size={12} />
-          加入我们的 Discord
-        </a>
+      {/* Footer — desktop only */}
+      <div className="hidden md:flex flex-col gap-2 p-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+        <div className="text-[10px] text-center" style={{ color: "var(--muted-foreground)", opacity: 0.5 }}>
+          v0.1 · MVP
+        </div>
       </div>
     </aside>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { TrendingUp, MessageSquare } from "lucide-react";
 import type { Decision } from "@/types/decision";
 
 type Props = { decision: Decision };
@@ -92,9 +93,9 @@ export function DecisionTracking({ decision: initial }: Props) {
   const returnColor = liveReturn == null
     ? "var(--muted-foreground)"
     : liveReturn > 0
-    ? "var(--brand-green)"
+    ? "var(--color-up)"
     : liveReturn < 0
-    ? "var(--brand-red)"
+    ? "var(--color-down)"
     : "var(--foreground)";
 
   return (
@@ -103,7 +104,7 @@ export function DecisionTracking({ decision: initial }: Props) {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-            📈 交易跟踪
+            <TrendingUp size={16} className="text-brand-blue" /> 交易跟踪
           </h3>
           {saved && (
             <span className="text-xs" style={{ color: "var(--brand-green)" }}>已保存 ✓</span>
@@ -148,8 +149,8 @@ export function DecisionTracking({ decision: initial }: Props) {
 
       {/* Post reflection */}
       <div>
-        <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--foreground)" }}>
-          💭 事后复盘
+        <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <MessageSquare size={16} className="text-brand-purple" /> 事后复盘
         </h3>
         <textarea
           className="w-full px-3 py-2 rounded-lg text-sm border resize-none"

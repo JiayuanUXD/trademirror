@@ -12,27 +12,30 @@ export function WeekStats({ review: r }: Props) {
       color: "var(--brand-blue)",
     },
     {
-      icon: <AlertTriangle size={14} />,
+      icon: <AlertOctagon size={14} />,
       label: "高危交易",
-      value: `${r.dangerTradeCount} 笔`,
-      color: r.dangerTradeCount > 0 ? "var(--brand-warning)" : "var(--brand-green)",
+      value: r.dangerTradeCount === 0 ? "0" : String(r.dangerTradeCount),
+      sub: "笔高危操作",
+      color: r.dangerTradeCount > 0 ? "var(--brand-warning)" : "var(--color-up)",
     },
     {
       icon: <TrendingUp size={14} />,
-      label: "高 FOMO",
-      value: `${r.highFomoCount} 笔`,
-      color: r.highFomoCount > 0 ? "var(--brand-red)" : "var(--brand-green)",
+      label: "高情绪值",
+      value: r.highFomoCount === 0 ? "0" : String(r.highFomoCount),
+      sub: "FOMO ≥ 7",
+      color: r.highFomoCount > 0 ? "var(--color-down)" : "var(--color-up)",
     },
     {
-      icon: null,
-      label: "纪律分",
-      value: `${r.disciplineTotal}/14`,
+      icon: <BarChart3 size={14} />,
+      label: "盈亏偏离",
+      value: `${r.maxDrawdownPct.toFixed(1)}%`,
+      sub: "单笔最大回撤",
       color:
-        r.disciplineTotal >= 10
-          ? "var(--brand-green)"
-          : r.disciplineTotal >= 7
+        r.maxDrawdownPct <= 5
+          ? "var(--color-up)"
+          : r.maxDrawdownPct <= 10
           ? "var(--brand-warning)"
-          : "var(--brand-red)",
+          : "var(--color-down)",
     },
   ];
 

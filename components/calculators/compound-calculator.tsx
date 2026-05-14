@@ -66,14 +66,14 @@ export function CompoundCalculator() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border px-4 py-3 text-center"
               style={{ backgroundColor: "var(--surface-overlay)", borderColor: "var(--border-subtle)" }}>
-              <div className="text-xl font-bold" style={{ color: "var(--brand-green)" }}>
+              <div className="text-xl font-bold" style={{ color: "var(--color-up)" }}>
                 ¥{Math.round(final).toLocaleString()}
               </div>
               <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{n} 年后</div>
             </div>
             <div className="rounded-xl border px-4 py-3 text-center"
               style={{ backgroundColor: "var(--surface-overlay)", borderColor: "var(--border-subtle)" }}>
-              <div className="text-xl font-bold" style={{ color: totalGain >= 0 ? "var(--brand-green)" : "var(--brand-red)" }}>
+              <div className="text-xl font-bold" style={{ color: totalGain >= 0 ? "var(--color-up)" : "var(--color-down)" }}>
                 {totalGain >= 0 ? "+" : ""}¥{Math.round(Math.abs(totalGain)).toLocaleString()}
               </div>
               <div className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -95,10 +95,10 @@ export function CompoundCalculator() {
                 style={{ borderColor: "var(--border-subtle)", color: "var(--foreground)" }}>
                 <span style={{ color: "var(--muted-foreground)" }}>第 {row.year} 年</span>
                 <span className="text-right">¥{Math.round(row.amount).toLocaleString()}</span>
-                <span className="text-right" style={{ color: "var(--brand-green)" }}>
+                <span className="text-right" style={{ color: "var(--color-up)" }}>
                   +¥{Math.round(row.gain).toLocaleString()}
                 </span>
-                <span className="text-right" style={{ color: "var(--brand-green)" }}>
+                <span className="text-right" style={{ color: "var(--color-up)" }}>
                   +{row.pct.toFixed(0)}%
                 </span>
               </div>

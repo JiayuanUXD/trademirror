@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { getReviewById } from "@/lib/db/queries/reviews";
 import { getDecisions } from "@/lib/db/queries/decisions";
 import { WeekStats } from "@/components/reviews/week-stats";
@@ -26,7 +26,7 @@ export default async function ReviewDetailPage({ params }: Props) {
   );
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+    <div className="px-4 py-6 space-y-6">
       <div>
         <Link
           href="/reviews"
@@ -62,7 +62,7 @@ export default async function ReviewDetailPage({ params }: Props) {
           </p>
           {weekDecisions.map((d) => {
             const isBuy = d.action === "BUY" || d.action === "ADD";
-            const color = isBuy ? "var(--brand-red)" : "var(--brand-green)";
+            const color = isBuy ? "var(--color-up)" : "var(--color-down)";
             return (
               <div
                 key={d.id}
@@ -79,8 +79,8 @@ export default async function ReviewDetailPage({ params }: Props) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{d.stockName}</span>
                     {d.dangerSignals.length > 0 && (
-                      <span className="text-[11px]" style={{ color: "var(--brand-warning)" }}>
-                        ⚠ {d.dangerSignals.join(" · ")}
+                      <span className="text-[11px] flex items-center gap-0.5" style={{ color: "var(--brand-warning)" }}>
+                        <AlertTriangle size={10} /> {d.dangerSignals.join(" · ")}
                       </span>
                     )}
                   </div>

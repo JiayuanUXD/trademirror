@@ -2,15 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle, XCircle, Minus, Search, Target, MessageSquare } from "lucide-react";
 import type { MonthlyPortrait, ProblemEval, ProblemId, ProblemEvalItem } from "@/types/portrait";
 import { PROBLEM_DEFINITIONS, PROBLEM_IDS, NEXT_FOCUS_OPTIONS } from "@/types/portrait";
 
 type Props = { portrait: MonthlyPortrait };
 
-const EVAL_OPTIONS: { value: ProblemEval; label: string; color: string }[] = [
-  { value: "IMPROVED",  label: "✅ 改善", color: "var(--brand-green)" },
-  { value: "STABLE",    label: "➖ 持平", color: "var(--muted-foreground)" },
-  { value: "WORSENED",  label: "❌ 恶化", color: "var(--brand-red)" },
+const EVAL_OPTIONS: { value: ProblemEval; label: string; icon: React.ReactNode; color: string }[] = [
+  { value: "IMPROVED",  label: "改善", icon: <CheckCircle size={13} />, color: "var(--brand-green)" },
+  { value: "STABLE",    label: "持平", icon: <Minus size={13} />,       color: "var(--muted-foreground)" },
+  { value: "WORSENED",  label: "恶化", icon: <XCircle size={13} />,     color: "var(--brand-red)" },
 ];
 
 export function PortraitForm({ portrait: initial }: Props) {
@@ -67,8 +68,8 @@ export function PortraitForm({ portrait: initial }: Props) {
 
       {/* 6-problem evaluation */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-          🔍 六大问题对照表
+        <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <Search size={16} className="text-brand-blue" /> 六大问题对照表
         </h2>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
           对照本月数据，诚实评估每个问题的变化趋势
@@ -105,7 +106,9 @@ export function PortraitForm({ portrait: initial }: Props) {
                             border: `1px solid ${active ? color : "var(--border-subtle)"}`,
                           }}
                         >
-                          {label}
+                          <div className="flex items-center gap-1">
+                            {icon} {label}
+                          </div>
                         </button>
                       );
                     })}
@@ -119,7 +122,9 @@ export function PortraitForm({ portrait: initial }: Props) {
 
       {/* Monthly reflection */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>💭 本月体悟</h2>
+        <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <MessageSquare size={16} className="text-brand-purple" /> 本月体悟
+        </h2>
         <textarea
           className="w-full px-3 py-2 rounded-lg text-sm border resize-none"
           style={{
@@ -148,7 +153,9 @@ export function PortraitForm({ portrait: initial }: Props) {
 
       {/* Next month single focus */}
       <div className="space-y-2">
-        <h2 className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>🎯 下月改进重点</h2>
+        <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <Target size={16} className="text-brand-blue" /> 下月改进重点
+        </h2>
         <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
           只选一个，力出一孔，不允许"全都要"
         </p>
@@ -192,7 +199,9 @@ export function PortraitForm({ portrait: initial }: Props) {
             className="w-full h-10 rounded-lg text-sm font-medium text-white"
             style={{ backgroundColor: "var(--brand-blue)" }}
           >
-            ✅ 完成本月画像
+            <span className="flex items-center justify-center gap-1.5">
+              <CheckCircle size={16} /> 完成本月画像
+            </span>
           </button>
           <p className="text-center text-xs" style={{ color: "var(--muted-foreground)" }}>
             完成后体悟将锁定，问题评估仍可修改
@@ -205,7 +214,7 @@ export function PortraitForm({ portrait: initial }: Props) {
           className="flex items-center gap-2 px-4 py-3 rounded-lg text-sm"
           style={{ backgroundColor: "rgba(34,197,94,0.08)", color: "var(--brand-green)", border: "1px solid rgba(34,197,94,0.2)" }}
         >
-          ✅ 本月画像已完成
+          <CheckCircle size={16} /> 本月画像已完成
         </div>
       )}
     </div>

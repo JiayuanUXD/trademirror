@@ -37,7 +37,7 @@ export function BasisChart({ data }: { data: BasisBreakdownItem[] }) {
   const chartData = data.map((d) => ({
     name: d.name,
     count: d.count,
-    fill: d.type === "rational" ? "var(--brand-green)" : "var(--brand-red)",
+    fill: d.type === "rational" ? "var(--color-up)" : "var(--color-down)",
   }));
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -64,7 +64,7 @@ export function FomoChart({ data }: { data: FomoDistItem[] }) {
   const chartData = data.map((d) => ({
     score: String(d.score),
     count: d.count,
-    fill: d.score >= 7 ? "var(--brand-red)" : d.score >= 4 ? "var(--brand-warning)" : "var(--brand-green)",
+    fill: d.score >= 7 ? "var(--color-down)" : d.score >= 4 ? "var(--brand-warning)" : "var(--color-up)",
   }));
 
   return (
@@ -109,9 +109,9 @@ export function DangerChart({ data }: { data: DangerBreakdownItem[] }) {
 
 // 操作方向饼图
 const ACTION_COLORS: Record<string, string> = {
-  买入: "var(--brand-red)",
+  买入: "var(--color-up)",
   加仓: "#f87171",
-  卖出: "var(--brand-green)",
+  卖出: "var(--color-down)",
   减仓: "#86efac",
   清仓: "#4ade80",
 };
@@ -186,7 +186,7 @@ function ScatterTooltipContent({ active, payload }: ScatterTooltipProps) {
         {d.action} {d.stockName}
       </p>
       <p style={{ color: "var(--muted-foreground)" }}>FOMO：{d.fomoScore}</p>
-      <p style={{ color: d.return30Days >= 0 ? "var(--brand-green)" : "var(--brand-red)" }}>
+      <p style={{ color: d.return30Days >= 0 ? "var(--color-up)" : "var(--color-down)" }}>
         30日盈亏：{sign}{d.return30Days}%
       </p>
     </div>
@@ -210,7 +210,7 @@ export function FomoScatterChart({ data }: { data: FomoVsReturnItem[] }) {
   // 每个点按 FOMO≥7 vs 非危险着色
   const pointsWithColor = data.map((d) => ({
     ...d,
-    fill: d.fomoScore >= 7 ? "var(--brand-red)" : "var(--brand-blue)",
+    fill: d.fomoScore >= 7 ? "var(--color-down)" : "var(--brand-blue)",
   }));
 
   return (
@@ -242,7 +242,7 @@ export function FomoScatterChart({ data }: { data: FomoVsReturnItem[] }) {
           x={7}
           stroke="rgba(239,68,68,0.4)"
           strokeDasharray="4 2"
-          label={{ value: "高危区", position: "top", fontSize: 10, fill: "var(--brand-red)" }}
+          label={{ value: "高危区", position: "top", fontSize: 10, fill: "var(--color-down)" }}
         />
         <Tooltip content={<ScatterTooltipContent />} cursor={{ strokeDasharray: "3 3" }} />
         <Scatter

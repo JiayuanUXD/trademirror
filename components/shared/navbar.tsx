@@ -20,6 +20,7 @@ export function Navbar() {
       style={{
         backgroundColor: "var(--surface-sidebar)",
         borderColor: "var(--border-subtle)",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
       }}
     >
       {/* Logo */}

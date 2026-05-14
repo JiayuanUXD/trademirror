@@ -22,7 +22,7 @@ export default async function GoalDetailPage({ params }: Props) {
     : goal.realismScore >= 3 ? "var(--brand-warning)" : "var(--brand-red)";
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-5">
+    <div className="p-6 space-y-5">
       <Link href="/goals"
         className="inline-flex items-center gap-1 text-xs transition-colors"
         style={{ color: "var(--muted-foreground)" }}>

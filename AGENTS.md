@@ -1,0 +1,184 @@
+# TradeMirror · 项目宪章
+
+## 项目背景
+
+TradeMirror（交易之镜）是一个面向中国A股个人投资者的交易日志Web应用。
+核心定位：**不帮用户预测市场，帮用户看清自己**。
+
+完整产品需求见 @PRD_交易日志Web应用_TradeMirror.md
+
+## 用户画像
+
+主要用户：38岁IT工程师，本金80-150万，6年A股投资，情绪化交易困扰严重。
+他不需要又一个炒股软件，他需要一面照见自己交易模式的镜子。
+
+## 核心原则（最重要的5条）
+
+1. **简单胜过复杂**：MVP阶段不引入任何不必要的依赖、不过度抽象
+2. **移动端优先**：60%使用场景在手机上，所有页面必须移动端友好
+3. **数据本地优先**：用户敏感的交易数据，本地存储优先于云端
+4. **不连接券商交易接口**：仅记录用途，避免任何"代客交易"嫌疑
+5. **不提供荐股或交易建议**：UI/文案必须清晰，这是日志工具不是投顾
+
+## 技术栈
+
+### 前端
+- **框架**: Next.js 14+ (App Router)
+- **语言**: TypeScript（严格模式）
+- **样式**: Tailwind CSS + Shadcn/ui
+- **状态管理**: Zustand
+- **图表**: Recharts（基础）+ ECharts（K线/复杂图表）
+- **表单**: React Hook Form + Zod
+- **日期**: dayjs
+
+### 后端
+- **运行时**: Node.js 20+
+- **框架**: Next.js API Routes（MVP阶段无需单独后端服务）
+- **ORM**: Drizzle ORM
+- **数据库**: PostgreSQL（生产）/ SQLite（本地开发）
+- **认证**: NextAuth.js（v5）
+
+### 开发工具
+- **包管理**: pnpm
+- **代码规范**: ESLint + Prettier
+- **Git Hooks**: husky + lint-staged
+- **测试**: Vitest（单元）+ Playwright（E2E，V1.5后引入）
+
+## 代码风格
+
+### TypeScript
+- 严格模式（`strict: true`）
+- 不使用 `any`，必要时用 `unknown` + 类型守卫
+- 优先使用 `type` 而非 `interface`（除非需要继承）
+- 导出函数必须有显式返回类型
+
+### React/Next.js
+- 默认 Server Components，按需 `"use client"`
+- 文件命名：kebab-case（如 `decision-card.tsx`）
+- 组件命名：PascalCase（如 `DecisionCard`）
+- 组件目录结构：`components/{feature}/{component-name}.tsx`
+
+### 样式
+- 优先用 Tailwind 工具类
+- 颜色用 CSS 变量（在 `globals.css` 定义主题）
+- 避免内联 style，避免 styled-components
+- 移动端：所有页面在 375px 宽度下不能横向滚动
+
+### 导入顺序
+1. React/Next.js 内置
+2. 第三方库
+3. 项目内部模块（按层级：lib → hooks → components → types）
+4. 类型导入（用 `import type`）
+
+## 项目目录结构
+
+```
+trade-mirror/
+├── app/                      # Next.js App Router
+│   ├── (auth)/              # 认证相关路由
+│   ├── (dashboard)/         # 主应用路由组
+│   │   ├── decisions/       # 决策卡模块
+│   │   ├── holdings/        # 持仓库模块
+│   │   ├── reviews/         # 周/月复盘
+│   │   ├── analytics/       # 分析仪表盘
+│   │   └── settings/        # 设置
+│   ├── api/                 # API Routes
+│   └── globals.css
+├── components/
+│   ├── ui/                  # Shadcn 基础组件
+│   ├── decisions/           # 决策卡相关组件
+│   ├── holdings/            # 持仓相关组件
+│   └── shared/              # 跨模块组件
+├── lib/
+│   ├── db/                  # 数据库（schema + 查询）
+│   ├── utils/               # 工具函数
+│   ├── analytics/           # 分析算法
+│   └── validators/          # Zod schemas
+├── hooks/                   # React Hooks
+├── stores/                  # Zustand stores
+├── types/                   # 全局 TypeScript 类型
+└── public/                  # 静态资源
+```
+
+## 关键业务规则（必须遵守）
+
+### 决策卡（Decision Card）
+- **不允许删除**：错误不能被掩盖，只能"归档"
+- **不允许修改情绪评分**：填了就锁定，避免事后美化
+- **必填字段**：股票、方向、价格、数量、理由、决策依据、3项情绪评分、止损价
+- **危险信号自动计算**：FOMO≥7 / 平静度≤4 / 不符合体系 / 含非理性决策依据
+
+### 持仓档案
+- **每只股票一份档案**
+- **逻辑评分0-10**：根据理由数量、可验证性、财务数据完整度
+- **撤退条件可checkbox打勾**：触发即推送预警
+
+### 周/月复盘
+- **不能跳过**：上周复盘未完成，不能开始新一周的决策卡
+- **三问必填**：本周最对的事、最错的事、重来一次会怎样
+
+## 开发工作流
+
+### 每次开始新功能前
+1. 阅读 @PRD_交易日志Web应用_TradeMirror.md 中对应模块
+2. 在 `docs/decisions/` 创建一份 ADR（架构决策记录）
+3. 先写类型定义和 Zod schema
+4. 再写数据层（DB schema + query）
+5. 再写 UI 组件
+6. 最后接入页面
+
+### Bug 修复
+- 不要"看起来修好了"就提交
+- 必须能解释清楚 root cause
+- 必须有单元测试覆盖（除非是纯UI bug）
+
+### Git Commit 规范
+- 用约定式提交（Conventional Commits）
+- 类型：feat / fix / docs / style / refactor / test / chore
+- 例：`feat(decisions): add danger signal calculation`
+
+## 性能要求
+
+- 首屏加载 < 2s（Lighthouse Performance > 90）
+- API 响应 P95 < 200ms
+- 数据库查询必须有索引规划，不允许全表扫描
+
+## 安全要求
+
+- 所有用户输入必须 Zod 校验
+- 数据库查询使用参数化（Drizzle 自动处理）
+- 密码用 bcrypt（cost ≥ 12）
+- 敏感数据（如账户金额）传输用 HTTPS（本地开发除外）
+- 不要把 .env 文件提交到 git
+
+## 我喜欢什么/不喜欢什么
+
+### 喜欢
+- 简洁的代码，函数 < 50 行
+- 类型严谨，让编译器替我抓 bug
+- 完整的注释，特别是"为什么这么做"
+- 渐进增强，先跑起来再优化
+
+### 不喜欢
+- 过度设计（YAGNI 原则）
+- 引入大型库解决小问题（如为了发个请求引入 axios）
+- 默认配置一大堆魔法，需要查文档才能理解
+- 抽象层数过多（最多3层）
+- 任何形式的 "TODO: implement later"（要么做，要么不做，不留烂尾）
+
+## 调试与提问
+
+当你不确定时：
+- 不要瞎猜，先问我
+- 提供 2-3 个选项让我选，不要给一个"最佳方案"
+- 重要的架构决策（数据库 schema、状态管理结构）必须先讨论再实施
+
+当你完成一个功能时：
+- 告诉我做了什么（不超过5条）
+- 告诉我没做什么（明确scope）
+- 告诉我下一步建议
+
+当你犯错时：
+- 直接说"我错了"，不要绕弯子
+- 解释错在哪
+- 说怎么避免再犯

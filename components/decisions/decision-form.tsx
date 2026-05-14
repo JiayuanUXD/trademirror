@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Lightbulb, CheckCircle } from "lucide-react";
 import { StepIndicator } from "./step-indicator";
 import { ScorePicker } from "./score-picker";
 import { DangerDialog } from "./danger-dialog";
@@ -233,7 +234,7 @@ export function DecisionForm() {
             color: "var(--brand-blue)",
           }}
         >
-          <span className="mt-0.5">💡</span>
+          <span className="mt-0.5"><Lightbulb size={16} /></span>
           <div>
             <p className="font-medium text-sm">操作已暂缓</p>
             <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -681,7 +682,11 @@ export function DecisionForm() {
             className="flex-1 h-10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ backgroundColor: "var(--brand-blue)" }}
           >
-            {isSubmitting ? "提交中…" : "✅ 记录这笔决策"}
+            {isSubmitting ? "提交中…" : (
+              <span className="flex items-center gap-1.5">
+                <CheckCircle size={16} /> 记录这笔决策
+              </span>
+            )}
           </button>
         )}
       </div>

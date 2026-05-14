@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle, Clock } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle } from "lucide-react";
 import { getPortraits, getPortraitByYearMonth, createPortrait } from "@/lib/db/queries/portraits";
 import dayjs from "dayjs";
 
@@ -23,7 +23,7 @@ export default async function PortraitsPage() {
   const all = await getPortraits();
 
   return (
-    <div className="px-4 py-5 sm:px-6 sm:py-6 max-w-4xl mx-auto space-y-6">
+    <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div>
         <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>月度画像</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
@@ -51,12 +51,14 @@ export default async function PortraitsPage() {
               </span>
             </div>
             <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
-              {current.status === "COMPLETED" ? "本月画像已完成 ✅" : "本月画像待完成"}
+              {current.status === "COMPLETED" ? "本月画像已完成" : "本月画像待完成"}
             </h2>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
               <span>决策 {current.decisionCount} 笔</span>
               {current.dangerCount > 0 && (
-                <span style={{ color: "var(--brand-warning)" }}>⚠ 高危 {current.dangerCount} 笔</span>
+                <span className="flex items-center gap-1" style={{ color: "var(--brand-warning)" }}>
+                  <AlertTriangle size={12} /> 高危 {current.dangerCount} 笔
+                </span>
               )}
               {current.decisionCount > 0 && (
                 <span style={{ color: evalColor(current.fomoAvg, "fomo") }}>

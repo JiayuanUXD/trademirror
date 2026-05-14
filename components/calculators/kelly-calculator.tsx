@@ -17,9 +17,9 @@ export function KellyCalculator() {
   const valid = w > 0 && w < 1 && wPct > 0 && lPct > 0;
 
   function kellyColor(k: number) {
-    if (k <= 0) return "var(--brand-red)";
+    if (k <= 0) return "var(--color-down)";
     if (k > 0.5) return "var(--brand-warning)";
-    return "var(--brand-green)";
+    return "var(--color-up)";
   }
 
   function kellyAdvice(k: number) {
@@ -72,7 +72,7 @@ export function KellyCalculator() {
                 <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>全凯利仓位</div>
               </div>
               <div className="text-center py-3 rounded-lg" style={{ backgroundColor: "var(--surface-card)" }}>
-                <div className="text-2xl font-bold" style={{ color: halfKelly > 0 ? "var(--brand-green)" : "var(--brand-red)" }}>
+                <div className="text-2xl font-bold" style={{ color: halfKelly > 0 ? "var(--color-up)" : "var(--color-down)" }}>
                   {halfKelly > 0 ? `${(halfKelly * 100).toFixed(1)}%` : "—"}
                 </div>
                 <div className="text-xs mt-1" style={{ color: "var(--muted-foreground)" }}>推荐仓位（半凯利）</div>
@@ -87,7 +87,7 @@ export function KellyCalculator() {
               </div>
               <div>
                 <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>期望值（每元）</span>
-                <div className="text-sm font-medium mt-0.5" style={{ color: kelly > 0 ? "var(--brand-green)" : "var(--brand-red)" }}>
+                <div className="text-sm font-medium mt-0.5" style={{ color: kelly > 0 ? "var(--color-up)" : "var(--color-down)" }}>
                   {((w * wPct - (1 - w) * lPct) * 100).toFixed(2)}%
                 </div>
               </div>

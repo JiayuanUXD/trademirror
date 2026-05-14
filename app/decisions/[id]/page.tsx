@@ -55,7 +55,7 @@ export default async function DecisionDetailPage({ params }: Props) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+    <div className="px-4 py-6 space-y-5">
       {/* Back */}
       <Link
         href="/decisions"

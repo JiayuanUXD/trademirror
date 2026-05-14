@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import type { DisciplineItem, DisciplineScore } from "@/types/review";
 
 type Props = {
@@ -98,10 +99,10 @@ export function DisciplineScorer({ items, onChange, locked = false }: Props) {
 
       {total < 8 && (
         <div
-          className="text-xs px-3 py-2 rounded-lg"
+          className="text-xs px-3 py-2 rounded-lg flex items-center gap-2"
           style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "var(--brand-red)", border: "1px solid rgba(239,68,68,0.2)" }}
         >
-          ⚠ 纪律分低于 8，建议本周暂停交易，冷静复盘
+          <AlertTriangle size={14} /> 纪律分低于 8，建议本周暂停交易，冷静复盘
         </div>
       )}
     </div>

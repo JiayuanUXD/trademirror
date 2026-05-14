@@ -109,7 +109,7 @@ export function TaxCalculator() {
                   {row.label}
                 </span>
                 <span className="text-xs font-medium" style={{
-                  color: row.green ? "var(--brand-green)" : row.red ? "var(--brand-red)" : "var(--foreground)"
+                  color: row.green ? "var(--color-up)" : row.red ? "var(--color-down)" : "var(--foreground)"
                 }}>
                   {row.value}
                 </span>

@@ -125,8 +125,8 @@ export function AddPositionAdvisor() {
     : null;
 
   const verdictConfig = {
-    BUY: { icon: <CheckCircle size={18} />, color: "var(--brand-green)", bg: "rgba(0,196,154,0.08)", border: "rgba(0,196,154,0.25)" },
-    SKIP: { icon: <XCircle size={18} />, color: "var(--brand-red)", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.25)" },
+    BUY: { icon: <CheckCircle size={18} />, color: "var(--color-up)", bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.25)" },
+    SKIP: { icon: <XCircle size={18} />, color: "var(--color-down)", bg: "rgba(34,197,94,0.08)", border: "rgba(34,197,94,0.25)" },
     WARN: { icon: <AlertTriangle size={18} />, color: "var(--brand-warning)", bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.25)" },
   };
 
@@ -156,7 +156,7 @@ export function AddPositionAdvisor() {
         <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
           style={{ backgroundColor: "var(--surface-overlay)" }}>
           <span style={{ color: "var(--muted-foreground)" }}>持仓浮动：</span>
-          <span className="font-semibold" style={{ color: drawdown >= 0 ? "var(--brand-green)" : "var(--brand-red)" }}>
+          <span className="font-semibold" style={{ color: drawdown >= 0 ? "var(--color-up)" : "var(--color-down)" }}>
             {drawdown >= 0 ? "+" : ""}{drawdown.toFixed(2)}%
           </span>
         </div>

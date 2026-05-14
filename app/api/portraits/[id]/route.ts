@@ -2,23 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPortraitById, updatePortrait } from "@/lib/db/queries/portraits";
 import { z } from "zod";
 
-const PROBLEM_IDS = [
-  "overleverage",
-  "chasing_hot",
-  "averaging_down",
-  "no_profit_taking",
-  "emotional_trading",
-  "unrealistic_goals",
-] as const;
+import { PROBLEM_IDS } from "@/types/portrait";
+import type { ProblemEvalItem } from "@/types/portrait";
 
 const patchSchema = z.object({
   reflection: z.string().max(500).optional(),
   nextFocus: z.string().optional(),
   problemEvals: z
-    .array(z.object({ id: z.enum(PROBLEM_IDS), eval: z.enum(["IMPROVED", "STABLE", "WORSENED"]) }))
+    .array(
+      z.object({
+        id: z.enum(PROBLEM_IDS as [string, ...string[]]).transform((v) => v as any),
+        eval: z.enum(["IMPROVED", "STABLE", "WORSENED"]).transform((v) => v as any),
+      })
+    )
     .optional(),
+
   complete: z.boolean().optional(),
 });
+
 
 type Params = { params: Promise<{ id: string }> };
 

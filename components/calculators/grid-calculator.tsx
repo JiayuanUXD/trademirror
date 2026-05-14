@@ -62,7 +62,7 @@ export function GridCalculator() {
             ].map(({ label, value }) => (
               <div key={label} className="rounded-lg border px-3 py-2.5 text-center"
                 style={{ backgroundColor: "var(--surface-overlay)", borderColor: "var(--border-subtle)" }}>
-                <div className="text-sm font-semibold" style={{ color: "var(--brand-green)" }}>{value}</div>
+                <div className="text-sm font-semibold" style={{ color: "var(--color-up)" }}>{value}</div>
                 <div className="text-[10px] mt-0.5" style={{ color: "var(--muted-foreground)" }}>{label}</div>
               </div>
             ))}
@@ -81,7 +81,7 @@ export function GridCalculator() {
                 <span style={{ color: "var(--muted-foreground)" }}>第 {i + 1} 格</span>
                 <span className="text-right">¥{price}</span>
                 <span className="text-right text-[11px]"
-                  style={{ color: i === 0 ? "var(--brand-green)" : i === gridPrices.length - 1 ? "var(--brand-red)" : "var(--muted-foreground)" }}>
+                  style={{ color: i === 0 ? "var(--color-up)" : i === gridPrices.length - 1 ? "var(--color-down)" : "var(--muted-foreground)" }}>
                   {i === 0 ? "触底建仓" : i === gridPrices.length - 1 ? "触顶清仓" : `涨至此卖 / 跌至此买`}
                 </span>
               </div>

@@ -91,7 +91,7 @@ export function PortraitForm({ portrait: initial }: Props) {
                     <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>{def.desc}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    {EVAL_OPTIONS.map(({ value, label, color }) => {
+                    {EVAL_OPTIONS.map(({ value, label, color, icon }) => {
                       const active = current === value;
                       return (
                         <button

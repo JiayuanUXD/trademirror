@@ -1,5 +1,5 @@
 import { DecisionForm } from "@/components/decisions/decision-form";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Lock } from "lucide-react";
 import Link from "next/link";
 import { getReviewByWeekStart } from "@/lib/db/queries/reviews";
 import { getWeekStart, getWeekEnd, formatWeekLabel } from "@/lib/week";

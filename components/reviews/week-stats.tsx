@@ -1,5 +1,5 @@
 import type { WeeklyReview } from "@/types/review";
-import { AlertTriangle, TrendingUp, FileText } from "lucide-react";
+import { AlertTriangle, TrendingUp, FileText, Star } from "lucide-react";
 
 type Props = { review: WeeklyReview };
 
@@ -12,30 +12,27 @@ export function WeekStats({ review: r }: Props) {
       color: "var(--brand-blue)",
     },
     {
-      icon: <AlertOctagon size={14} />,
+      icon: <AlertTriangle size={14} />,
       label: "高危交易",
       value: r.dangerTradeCount === 0 ? "0" : String(r.dangerTradeCount),
-      sub: "笔高危操作",
-      color: r.dangerTradeCount > 0 ? "var(--brand-warning)" : "var(--color-up)",
+      color: r.dangerTradeCount > 0 ? "var(--brand-warning)" : "var(--brand-green)",
     },
     {
       icon: <TrendingUp size={14} />,
-      label: "高情绪值",
+      label: "高 FOMO",
       value: r.highFomoCount === 0 ? "0" : String(r.highFomoCount),
-      sub: "FOMO ≥ 7",
-      color: r.highFomoCount > 0 ? "var(--color-down)" : "var(--color-up)",
+      color: r.highFomoCount > 0 ? "var(--brand-red)" : "var(--brand-green)",
     },
     {
-      icon: <BarChart3 size={14} />,
-      label: "盈亏偏离",
-      value: `${r.maxDrawdownPct.toFixed(1)}%`,
-      sub: "单笔最大回撤",
+      icon: <Star size={14} />,
+      label: "纪律分",
+      value: `${r.disciplineTotal}/14`,
       color:
-        r.maxDrawdownPct <= 5
-          ? "var(--color-up)"
-          : r.maxDrawdownPct <= 10
+        r.disciplineTotal >= 12
+          ? "var(--brand-green)"
+          : r.disciplineTotal >= 8
           ? "var(--brand-warning)"
-          : "var(--color-down)",
+          : "var(--brand-red)",
     },
   ];
 

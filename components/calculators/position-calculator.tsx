@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (

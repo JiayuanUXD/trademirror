@@ -1,11 +1,16 @@
 "use client";
 
-import { Bell, Search, User } from "lucide-react";
+import { Bell, Search, LogOut } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { signOut } from "next-auth/react";
 
-export function Navbar() {
+type UserInfo = { name: string; email: string } | null;
+
+export function Navbar({ user }: { user: UserInfo }) {
   const [alertHigh, setAlertHigh] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/alerts")
@@ -13,6 +18,19 @@ export function Navbar() {
       .then((d: { highCount: number }) => setAlertHigh(d.highCount))
       .catch(() => {});
   }, []);
+
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      setMenuOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen, handleClickOutside]);
 
   return (
     <header
@@ -66,12 +84,54 @@ export function Navbar() {
           )}
         </Link>
 
-        {/* Avatar */}
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center ml-1"
-          style={{ backgroundColor: "var(--surface-overlay)" }}
-        >
-          <User size={13} style={{ color: "var(--muted-foreground)" }} />
+        {/* User avatar dropdown */}
+        <div className="relative ml-1" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="w-7 h-7 rounded-full flex items-center justify-center transition-colors hover:bg-white/[0.06]"
+            style={{ backgroundColor: "var(--surface-overlay)" }}
+          >
+            {user ? (
+              <span
+                className="text-[10px] font-bold text-white"
+                style={{ color: "var(--foreground)" }}
+              >
+                {user.name.charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>?</span>
+            )}
+          </button>
+
+          {menuOpen && user && (
+            <div
+              className="absolute right-0 top-full mt-1 w-44 rounded-lg border shadow-lg py-1 z-50"
+              style={{
+                backgroundColor: "var(--surface-card)",
+                borderColor: "var(--border-subtle)",
+              }}
+            >
+              <div
+                className="px-3 py-2 text-xs border-b"
+                style={{ borderColor: "var(--border-subtle)" }}
+              >
+                <div className="font-medium truncate" style={{ color: "var(--foreground)" }}>
+                  {user.name}
+                </div>
+                <div className="truncate mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                  {user.email}
+                </div>
+              </div>
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-white/[0.05]"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                <LogOut size={12} />
+                退出登录
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

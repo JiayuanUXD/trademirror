@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { createDecisionSchema } from "@/lib/validators/decision";
 import { createDecision, getDecisions } from "@/lib/db/queries/decisions";
 import { calcDangerSignals } from "@/lib/danger-signals";
 
+async function getUserId(): Promise<string | null> {
+  const session = await auth();
+  return session?.user?.id ?? null;
+}
+
 export async function GET() {
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    const list = await getDecisions();
+    const list = await getDecisions(userId);
     return NextResponse.json(list);
   } catch (err) {
     console.error("[GET /api/decisions]", err);
@@ -14,6 +23,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body: unknown = await req.json();
     const parsed = createDecisionSchema.safeParse(body);
@@ -56,8 +68,8 @@ export async function POST(req: NextRequest) {
       maxAcceptableLoss,
       dangerSignals,
       isArchived: false,
-      createdAt: Date.now(),
-    });
+      createdAt: data.tradedAt || Date.now(),
+    }, userId);
 
     return NextResponse.json(decision, { status: 201 });
   } catch (err) {

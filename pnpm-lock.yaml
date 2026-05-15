@@ -8,12 +8,18 @@ dependencies:
   '@anthropic-ai/sdk':
     specifier: ^0.95.2
     version: 0.95.2(zod@4.4.3)
+  '@auth/drizzle-adapter':
+    specifier: ^1.11.2
+    version: 1.11.2
   '@base-ui/react':
     specifier: ^1.4.1
     version: 1.4.1(@types/react@19.0.0)(react-dom@19.2.4)(react@19.2.4)
   '@libsql/client':
     specifier: ^0.17.3
     version: 0.17.3
+  bcryptjs:
+    specifier: ^3.0.3
+    version: 3.0.3
   class-variance-authority:
     specifier: ^0.7.1
     version: 0.7.1
@@ -32,6 +38,9 @@ dependencies:
   next:
     specifier: 16.2.6
     version: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.4)(react@19.2.4)
+  next-auth:
+    specifier: 5.0.0-beta.31
+    version: 5.0.0-beta.31(next@16.2.6)(react@19.2.4)
   react:
     specifier: 19.2.4
     version: 19.2.4
@@ -67,6 +76,9 @@ devDependencies:
   '@tailwindcss/postcss':
     specifier: ^4.3.0
     version: 4.3.0
+  '@types/bcryptjs':
+    specifier: ^3.0.0
+    version: 3.0.0
   '@types/node':
     specifier: ^20.0.0
     version: 20.0.0
@@ -123,6 +135,37 @@ packages:
       json-schema-to-ts: 3.1.1
       standardwebhooks: 1.0.0
       zod: 4.4.3
+    dev: false
+
+  /@auth/core@0.41.2:
+    resolution: {integrity: sha512-Hx5MNBxN2fJTbJKGUKAA0wca43D0Akl3TvufY54Gn8lop7F+34vU1zA1pn0vQfIoVuLIrpfc2nkyjwIaPJMW7w==}
+    peerDependencies:
+      '@simplewebauthn/browser': ^9.0.1
+      '@simplewebauthn/server': ^9.0.2
+      nodemailer: ^7.0.7
+    peerDependenciesMeta:
+      '@simplewebauthn/browser':
+        optional: true
+      '@simplewebauthn/server':
+        optional: true
+      nodemailer:
+        optional: true
+    dependencies:
+      '@panva/hkdf': 1.2.1
+      jose: 6.2.3
+      oauth4webapi: 3.8.6
+      preact: 10.24.3
+      preact-render-to-string: 6.5.11(preact@10.24.3)
+    dev: false
+
+  /@auth/drizzle-adapter@1.11.2:
+    resolution: {integrity: sha512-VOuj7REI8jfJjpSbsYwDM/Zrn55T6lS9Yc+29V+EXMcel8eqG7x+7LodNfd1WHjakfkLYi+qsbYUHB3E6aDA4w==}
+    dependencies:
+      '@auth/core': 0.41.2
+    transitivePeerDependencies:
+      - '@simplewebauthn/browser'
+      - '@simplewebauthn/server'
+      - nodemailer
     dev: false
 
   /@babel/code-frame@7.29.0:
@@ -1937,6 +1980,10 @@ packages:
     resolution: {integrity: sha512-3oz8m3FGdr2nDXVqmFUw7jolKliC4MoyXYIG2c7gpjBnzUWQpUGIYcXYKxTdTi+N2jusvt610ckTMkxdwHkYEg==}
     dev: true
 
+  /@panva/hkdf@1.2.1:
+    resolution: {integrity: sha512-6oclG6Y3PiDFcoyk8srjLfVKyMfVCKJ27JwNPViuXziFpmdz+MZnZN/aKY0JGXgYuO/VghU0jcOAZgWXZ1Dmrw==}
+    dev: false
+
   /@reduxjs/toolkit@2.11.2(react-redux@9.2.0)(react@19.2.4):
     resolution: {integrity: sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ==}
     peerDependencies:
@@ -2309,6 +2356,13 @@ packages:
       tslib: 2.8.1
     dev: true
     optional: true
+
+  /@types/bcryptjs@3.0.0:
+    resolution: {integrity: sha512-WRZOuCuaz8UcZZE4R5HXTco2goQSI2XxjGY3hbM/xDvwmqFWd4ivooImsMx65OKM6CtNKbnZ5YL+YwAwK7c1dg==}
+    deprecated: This is a stub types definition. bcryptjs provides its own type definitions, so you do not need this installed.
+    dependencies:
+      bcryptjs: 3.0.3
+    dev: true
 
   /@types/chai@5.2.3:
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -3003,6 +3057,10 @@ packages:
   /baseline-browser-mapping@2.10.29:
     resolution: {integrity: sha512-Asa2krT+XTPZINCS+2QcyS8WTkObE77RwkydwF7h6DmnKqbvlalz93m/dnphUyCa6SWSP51VgtEUf2FN+gelFQ==}
     engines: {node: '>=6.0.0'}
+    hasBin: true
+
+  /bcryptjs@3.0.3:
+    resolution: {integrity: sha512-GlF5wPWnSa/X5LKM1o0wz0suXIINz1iHRLvTS+sLyi7XPbe5ycmYI3DlZqVGZZtDgl4DmasFg7gOB3JYbphV5g==}
     hasBin: true
 
   /body-parser@2.2.2:
@@ -5569,6 +5627,27 @@ packages:
     engines: {node: '>= 0.6'}
     dev: false
 
+  /next-auth@5.0.0-beta.31(next@16.2.6)(react@19.2.4):
+    resolution: {integrity: sha512-1OBgCKPzo+S7UWWMp3xgvGvIJ0OpV7B3vR4ZDRqD9a4Ch+OT6dakLXG9ivhtmIWVa71nTSXattOHyCg8sNi8/Q==}
+    peerDependencies:
+      '@simplewebauthn/browser': ^9.0.1
+      '@simplewebauthn/server': ^9.0.2
+      next: ^14.0.0-0 || ^15.0.0 || ^16.0.0
+      nodemailer: ^7.0.7
+      react: ^18.2.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@simplewebauthn/browser':
+        optional: true
+      '@simplewebauthn/server':
+        optional: true
+      nodemailer:
+        optional: true
+    dependencies:
+      '@auth/core': 0.41.2
+      next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.4)(react@19.2.4)
+      react: 19.2.4
+    dev: false
+
   /next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.4)(react@19.2.4):
     resolution: {integrity: sha512-qOVgKJg1+At15NpeUP+eJgCHvTCgXsogweq87Ri/Ix7PkqQHg4sdaXmSFqKlgaIXE4kW0g25LE68W87UANlHtw==}
     engines: {node: '>=20.9.0'}
@@ -5654,6 +5733,10 @@ packages:
     dependencies:
       path-key: 4.0.0
       unicorn-magic: 0.3.0
+    dev: false
+
+  /oauth4webapi@3.8.6:
+    resolution: {integrity: sha512-iwemM91xz8nryHti2yTmg5fhyEMVOkOXwHNqbvcATjyajb5oQxCQzrNOA6uElRHuMhQQTKUyFKV9y/CNyg25BQ==}
     dev: false
 
   /object-assign@4.1.1:
@@ -5930,6 +6013,18 @@ packages:
   /powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
     engines: {node: '>=20'}
+    dev: false
+
+  /preact-render-to-string@6.5.11(preact@10.24.3):
+    resolution: {integrity: sha512-ubnauqoGczeGISiOh6RjX0/cdaF8v/oDXIjO85XALCQjwQP+SB4RDXXtvZ6yTYSjG+PC1QRP2AhPgCEsM2EvUw==}
+    peerDependencies:
+      preact: '>=10'
+    dependencies:
+      preact: 10.24.3
+    dev: false
+
+  /preact@10.24.3:
+    resolution: {integrity: sha512-Z2dPnBnMUfyQfSQ+GBdsGa16hz35YmLmtTLhM169uW944hYL6xzTYkJjC07j+Wosz733pMWx0fgON3JNw1jJQA==}
     dev: false
 
   /prelude-ls@1.2.1:

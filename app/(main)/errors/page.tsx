@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { getErrorTypes } from "@/lib/db/queries/errors";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { ErrorLibraryClient } from "@/components/errors/error-library-client";
@@ -26,7 +27,11 @@ function TrendLabel({ trend }: { trend: "INCREASING" | "STABLE" | "DECREASING" }
 }
 
 export default async function ErrorsPage() {
-  const types = await getErrorTypes();
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
+  const types = await getErrorTypes(userId);
 
   // Sort: most occurrences first, then by total cost (most negative)
   const sorted = [...types].sort((a, b) => {

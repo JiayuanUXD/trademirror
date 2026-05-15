@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lightbulb, CheckCircle } from "lucide-react";
+import { StockCombobox, StockItem } from "@/components/shared/stock-combobox";
 import { StepIndicator } from "./step-indicator";
 import { ScorePicker } from "./score-picker";
 import { DangerDialog } from "./danger-dialog";
@@ -26,6 +27,7 @@ type Step1State = {
   price: string;
   quantity: string;
   reason: string;
+  tradedAt: string;
 };
 
 type Step2State = {
@@ -64,6 +66,7 @@ export function DecisionForm() {
     price: "",
     quantity: "",
     reason: "",
+    tradedAt: "",
   });
 
   const [s2, setS2] = useState<Step2State>({
@@ -91,6 +94,7 @@ export function DecisionForm() {
       ...s1,
       price: Number(s1.price),
       quantity: Number(s1.quantity),
+      tradedAt: s1.tradedAt ? new Date(s1.tradedAt).getTime() : undefined,
     });
     if (!result.success) {
       const errs: Record<string, string> = {};
@@ -177,6 +181,7 @@ export function DecisionForm() {
         price: Number(s1.price),
         quantity: Number(s1.quantity),
         reason: s1.reason,
+        tradedAt: s1.tradedAt ? new Date(s1.tradedAt).getTime() : undefined,
         basis: s2.basis,
         calmScore: s2.calmScore,
         confidenceScore: s2.confidenceScore,
@@ -252,82 +257,60 @@ export function DecisionForm() {
       {/* ── Step 1 ── */}
       {step === 0 && (
         <div className="space-y-4">
-          {/* Stock + market */}
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2">
-            <div className="space-y-1">
-              <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                股票代码
-              </label>
-              <input
-                className="w-full h-9 px-3 rounded-md text-sm border"
-                style={{
-                  backgroundColor: "var(--surface-overlay)",
-                  borderColor: errors.stockCode ? "var(--brand-red)" : "var(--border-subtle)",
-                  color: "var(--foreground)",
-                }}
-                placeholder="600519"
-                maxLength={6}
-                value={s1.stockCode}
-                onChange={(e) => {
-                  setS1((p) => ({ ...p, stockCode: e.target.value }));
-                  clearError("stockCode");
-                }}
-              />
-              {errors.stockCode && (
-                <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stockCode}</p>
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                市场
-              </label>
-              <div className="flex gap-1">
-                {MARKET_OPTIONS.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setS1((p) => ({ ...p, stockMarket: m.value }))}
-                    className="h-9 w-9 rounded-md text-xs font-medium transition-colors"
-                    style={{
-                      backgroundColor:
-                        s1.stockMarket === m.value
-                          ? "var(--brand-blue)"
-                          : "var(--surface-overlay)",
-                      color:
-                        s1.stockMarket === m.value ? "#fff" : "var(--muted-foreground)",
-                      border: `1px solid ${s1.stockMarket === m.value ? "var(--brand-blue)" : "var(--border-subtle)"}`,
-                    }}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Stock name */}
+          {/* Stock search */}
           <div className="space-y-1">
             <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              股票名称
+              股票（输入代码或名称搜索）
             </label>
-            <input
-              className="w-full h-9 px-3 rounded-md text-sm border"
-              style={{
-                backgroundColor: "var(--surface-overlay)",
-                borderColor: errors.stockName ? "var(--brand-red)" : "var(--border-subtle)",
-                color: "var(--foreground)",
-              }}
-              placeholder="贵州茅台"
-              value={s1.stockName}
-              onChange={(e) => {
-                setS1((p) => ({ ...p, stockName: e.target.value }));
+            <StockCombobox
+              initialCode={s1.stockCode}
+              initialName={s1.stockName}
+              onSelect={(stock: StockItem) => {
+                setS1((p) => ({
+                  ...p,
+                  stockCode: stock.code,
+                  stockName: stock.name,
+                  stockMarket: stock.market,
+                }));
+                clearError("stockCode");
                 clearError("stockName");
               }}
             />
-            {errors.stockName && (
-              <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stockName}</p>
+            {(errors.stockCode || errors.stockName) && (
+              <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>
+                {errors.stockCode || errors.stockName}
+              </p>
             )}
+            {s1.stockCode && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-mono" style={{ color: "var(--brand-blue)" }}>{s1.stockCode}</span>
+                <span className="text-xs" style={{ color: "var(--foreground)" }}>{s1.stockName}</span>
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                  style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "var(--muted-foreground)" }}
+                >
+                  {s1.stockMarket === "SH" ? "沪" : s1.stockMarket === "SZ" ? "深" : "北"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Date/time */}
+          <div className="space-y-1">
+            <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+              交易时间（留空默认当前）
+            </label>
+            <input
+              type="datetime-local"
+              className="w-full h-9 px-3 rounded-md text-sm border"
+              style={{
+                backgroundColor: "var(--surface-overlay)",
+                borderColor: "var(--border-subtle)",
+                color: "var(--foreground)",
+              }}
+              value={s1.tradedAt}
+              onChange={(e) => setS1((p) => ({ ...p, tradedAt: e.target.value }))}
+            />
           </div>
 
           {/* Action */}

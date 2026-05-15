@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "../index";
 import { decisions } from "../schema";
 import type { Decision, DangerSignal, DecisionBasis } from "@/types/decision";
@@ -12,28 +12,28 @@ function rowToDecision(row: typeof decisions.$inferSelect): Decision {
   };
 }
 
-export async function getDecisions(limit = 50): Promise<Decision[]> {
+export async function getDecisions(userId: string, limit = 50): Promise<Decision[]> {
   const rows = await db
     .select()
     .from(decisions)
-    .where(eq(decisions.isArchived, false))
+    .where(and(eq(decisions.isArchived, false), eq(decisions.userId, userId)))
     .orderBy(desc(decisions.createdAt))
     .limit(limit);
   return rows.map(rowToDecision);
 }
 
-export async function getDecisionById(id: string): Promise<Decision | null> {
+export async function getDecisionById(id: string, userId: string): Promise<Decision | null> {
   const rows = await db
     .select()
     .from(decisions)
-    .where(eq(decisions.id, id))
+    .where(and(eq(decisions.id, id), eq(decisions.userId, userId)))
     .limit(1);
   return rows[0] ? rowToDecision(rows[0]) : null;
 }
 
 export type InsertDecision = Omit<
   typeof decisions.$inferInsert,
-  "basis" | "dangerSignals"
+  "basis" | "dangerSignals" | "userId"
 > & {
   basis: DecisionBasis[];
   dangerSignals: DangerSignal[];
@@ -41,6 +41,7 @@ export type InsertDecision = Omit<
 
 export async function updateDecision(
   id: string,
+  userId: string,
   patch: {
     actualPrice?: number | null;
     priceAfter7Days?: number | null;
@@ -56,20 +57,21 @@ export async function updateDecision(
   if ("return30Days" in patch) set.return30Days = patch.return30Days;
   if ("postReflection" in patch) set.postReflection = patch.postReflection;
 
-  await db.update(decisions).set(set).where(eq(decisions.id, id));
-  const updated = await getDecisionById(id);
+  await db.update(decisions).set(set).where(and(eq(decisions.id, id), eq(decisions.userId, userId)));
+  const updated = await getDecisionById(id, userId);
   if (!updated) throw new Error("Decision not found");
   return updated;
 }
 
-export async function createDecision(input: InsertDecision): Promise<Decision> {
+export async function createDecision(input: InsertDecision, userId: string): Promise<Decision> {
   const row = {
     ...input,
+    userId,
     basis: JSON.stringify(input.basis),
     dangerSignals: JSON.stringify(input.dangerSignals),
   };
   await db.insert(decisions).values(row);
-  const created = await getDecisionById(input.id);
+  const created = await getDecisionById(input.id, userId);
   if (!created) throw new Error("Failed to create decision");
   return created;
 }

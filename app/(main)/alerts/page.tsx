@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { getDecisions } from "@/lib/db/queries/decisions";
 import { getHoldings } from "@/lib/db/queries/holdings";
 import { computeAlerts } from "@/lib/alerts";
@@ -6,9 +7,13 @@ import { AlertList } from "@/components/alerts/alert-list";
 export const dynamic = "force-dynamic";
 
 export default async function AlertsPage() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
   const [decisions, holdings] = await Promise.all([
-    getDecisions(200), // 多取用于时间模式分析
-    getHoldings(),
+    getDecisions(userId, 200),
+    getHoldings(userId),
   ]);
 
   const alerts = computeAlerts(decisions, holdings);

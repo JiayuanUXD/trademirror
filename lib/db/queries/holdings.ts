@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { db } from "../index";
 import { holdings } from "../schema";
 import type {
@@ -24,47 +24,50 @@ function rowToHolding(row: typeof holdings.$inferSelect): Holding {
   return h;
 }
 
-export async function getHoldings(): Promise<Holding[]> {
+export async function getHoldings(userId: string): Promise<Holding[]> {
   const rows = await db
     .select()
     .from(holdings)
+    .where(eq(holdings.userId, userId))
     .orderBy(desc(holdings.updatedAt));
   return rows.map(rowToHolding);
 }
 
-export async function getHoldingById(id: string): Promise<Holding | null> {
+export async function getHoldingById(id: string, userId: string): Promise<Holding | null> {
   const rows = await db
     .select()
     .from(holdings)
-    .where(eq(holdings.id, id))
+    .where(and(eq(holdings.id, id), eq(holdings.userId, userId)))
     .limit(1);
   return rows[0] ? rowToHolding(rows[0]) : null;
 }
 
 export type InsertHolding = Omit<
   typeof holdings.$inferInsert,
-  "logic" | "prerequisites" | "exitConditions"
+  "logic" | "prerequisites" | "exitConditions" | "userId"
 > & {
   logic: HoldingLogic;
   prerequisites: Prerequisite[];
   exitConditions: ExitCondition[];
 };
 
-export async function createHolding(input: InsertHolding): Promise<Holding> {
+export async function createHolding(input: InsertHolding, userId: string): Promise<Holding> {
   const row = {
     ...input,
+    userId,
     logic: JSON.stringify(input.logic),
     prerequisites: JSON.stringify(input.prerequisites),
     exitConditions: JSON.stringify(input.exitConditions),
   };
   await db.insert(holdings).values(row);
-  const created = await getHoldingById(input.id);
+  const created = await getHoldingById(input.id, userId);
   if (!created) throw new Error("Failed to create holding");
   return created;
 }
 
 export async function updateHolding(
   id: string,
+  userId: string,
   patch: Partial<InsertHolding>
 ): Promise<Holding> {
   const now = Date.now();
@@ -87,8 +90,8 @@ export async function updateHolding(
     if (patch[key] !== undefined) row[key] = patch[key];
   }
 
-  await db.update(holdings).set(row).where(eq(holdings.id, id));
-  const updated = await getHoldingById(id);
+  await db.update(holdings).set(row).where(and(eq(holdings.id, id), eq(holdings.userId, userId)));
+  const updated = await getHoldingById(id, userId);
   if (!updated) throw new Error("Holding not found");
   return updated;
 }

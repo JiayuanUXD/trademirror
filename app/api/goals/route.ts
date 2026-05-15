@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getGoals, createGoal } from "@/lib/db/queries/goals";
 
 export async function GET() {
-  const list = await getGoals();
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const list = await getGoals(userId);
   return NextResponse.json(list);
 }
 
 export async function POST(req: Request) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json() as {
     title?: string;
     startAmount?: number;
@@ -31,6 +40,6 @@ export async function POST(req: Request) {
     targetAmount: body.targetAmount,
     years: body.years,
     note: body.note,
-  });
+  }, userId);
   return NextResponse.json(goal, { status: 201 });
 }

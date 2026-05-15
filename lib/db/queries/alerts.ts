@@ -2,10 +2,10 @@ import { getDecisions } from "./decisions";
 import { getHoldings } from "./holdings";
 import { computeAlerts } from "@/lib/alerts";
 
-export async function getAlertStats() {
+export async function getAlertStats(userId: string) {
   const [decisions, holdings] = await Promise.all([
-    getDecisions(100),
-    getHoldings(),
+    getDecisions(userId, 100),
+    getHoldings(userId),
   ]);
   const alerts = computeAlerts(decisions, holdings);
   return {

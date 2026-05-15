@@ -12,6 +12,8 @@ import {
   Target,
   Settings,
   Bell,
+  Users,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -82,13 +84,13 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ role }: { role: "admin" | "user" }) {
   const pathname = usePathname();
   const [alertHighCount, setAlertHighCount] = useState(0);
 
   useEffect(() => {
     const eventSource = new EventSource("/api/alerts/sse");
-    
+
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -100,7 +102,6 @@ export function Sidebar() {
 
     return () => eventSource.close();
   }, []);
-
 
   return (
     <aside
@@ -130,7 +131,6 @@ export function Sidebar() {
                     : "text-[var(--muted-foreground)] hover:bg-white/[0.05] hover:text-[var(--foreground)]"
                 }`}
               >
-                {/* Icon */}
                 <span
                   className={`shrink-0 transition-colors ${
                     isActive ? "text-[var(--brand-blue)]" : ""
@@ -139,10 +139,8 @@ export function Sidebar() {
                   {item.icon}
                 </span>
 
-                {/* Label — hidden on mobile */}
                 <span className="hidden md:block flex-1 truncate">{item.label}</span>
 
-                {/* Badges — hidden on mobile */}
                 {item.badge && (
                   <span
                     className="hidden md:block text-[10px] px-1.5 py-0.5 rounded font-semibold"
@@ -153,14 +151,12 @@ export function Sidebar() {
                 )}
                 {isAlertsItem && alertHighCount > 0 && (
                   <>
-                    {/* Desktop badge */}
                     <span
                       className="hidden md:block text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center leading-none"
                       style={{ backgroundColor: "var(--brand-red)", color: "#fff" }}
                     >
                       {alertHighCount}
                     </span>
-                    {/* Mobile dot */}
                     <span
                       className="md:hidden absolute top-1 right-1 w-2 h-2 rounded-full"
                       style={{ backgroundColor: "var(--brand-red)" }}
@@ -171,14 +167,51 @@ export function Sidebar() {
             </div>
           );
         })}
+
+        {/* Admin section */}
+        {role === "admin" && (
+          <>
+            <div className="px-2.5 md:px-3 pt-3 pb-1">
+              <span
+                className="hidden md:block text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--muted-foreground)" }}
+              >
+                Admin
+              </span>
+            </div>
+            {[
+              { label: "用户管理", href: "/admin/users", icon: <Users size={15} /> },
+              { label: "全局统计", href: "/admin/stats", icon: <BarChart3 size={15} /> },
+            ].map((item) => {
+              const isActive =
+                pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <div key={item.href}>
+                  <Link
+                    href={item.href}
+                    title={item.label}
+                    className={`nav-item relative flex items-center gap-2.5 px-2.5 md:px-3 py-2 rounded-lg text-sm ${
+                      isActive
+                        ? "bg-[var(--sidebar-accent)] text-[var(--foreground)] shadow-[0_0_0_1px_rgba(61,142,248,0.2)]"
+                        : "text-[var(--muted-foreground)] hover:bg-white/[0.05] hover:text-[var(--foreground)]"
+                    }`}
+                  >
+                    <span
+                      className={`shrink-0 transition-colors ${
+                        isActive ? "text-[var(--brand-blue)]" : ""
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    <span className="hidden md:block flex-1 truncate">{item.label}</span>
+                  </Link>
+                </div>
+              );
+            })}
+          </>
+        )}
       </nav>
 
-      {/* Footer — desktop only */}
-      <div className="hidden md:flex flex-col gap-2 p-3" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-        <div className="text-[10px] text-center" style={{ color: "var(--muted-foreground)", opacity: 0.5 }}>
-          v0.1 · MVP
-        </div>
-      </div>
     </aside>
   );
 }

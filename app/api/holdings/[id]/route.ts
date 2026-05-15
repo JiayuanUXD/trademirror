@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { patchHoldingSchema } from "@/lib/validators/holding";
 import { getHoldingById, updateHolding } from "@/lib/db/queries/holdings";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
-    const holding = await getHoldingById(id);
+    const holding = await getHoldingById(id, userId);
     if (!holding) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -19,6 +24,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
     const body: unknown = await req.json();
@@ -31,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const data = parsed.data;
-    const holding = await updateHolding(id, {
+    const holding = await updateHolding(id, userId, {
       ...(data.status && { status: data.status }),
       ...(data.currentPrice !== undefined && { currentPrice: data.currentPrice }),
       ...(data.shares !== undefined && { shares: data.shares }),

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createHoldingSchema } from "@/lib/validators/holding";
 import type { HoldingStatus } from "@/types/holding";
 import { STATUS_LABELS } from "@/types/holding";
+import { StockCombobox, StockItem } from "@/components/shared/stock-combobox";
 
 const MARKET_OPTIONS = [
   { value: "SH" as const, label: "沪" },
@@ -74,44 +75,32 @@ export function HoldingForm() {
 
   return (
     <div className="space-y-4">
-      {/* Stock info */}
-      <div className="grid grid-cols-[1fr_auto] gap-2">
-        <div className="space-y-1">
-          <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>股票代码</label>
-          <input
-            className="w-full h-9 px-3 rounded-md text-sm border"
-            style={{ backgroundColor: "var(--surface-overlay)", borderColor: errors.stockCode ? "var(--brand-red)" : "var(--border-subtle)", color: "var(--foreground)" }}
-            placeholder="600519"
-            maxLength={6}
-            value={form.stockCode}
-            onChange={(e) => set("stockCode", e.target.value)}
-          />
-          {errors.stockCode && <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stockCode}</p>}
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>市场</label>
-          <div className="flex gap-1">
-            {MARKET_OPTIONS.map((m) => (
-              <button key={m.value} type="button" onClick={() => set("stockMarket", m.value)}
-                className="h-9 w-9 rounded-md text-xs font-medium transition-colors"
-                style={{ backgroundColor: form.stockMarket === m.value ? "var(--brand-blue)" : "var(--surface-overlay)", color: form.stockMarket === m.value ? "#fff" : "var(--muted-foreground)", border: `1px solid ${form.stockMarket === m.value ? "var(--brand-blue)" : "var(--border-subtle)"}` }}>
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
+      {/* Stock search */}
       <div className="space-y-1">
-        <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>股票名称</label>
-        <input
-          className="w-full h-9 px-3 rounded-md text-sm border"
-          style={{ backgroundColor: "var(--surface-overlay)", borderColor: errors.stockName ? "var(--brand-red)" : "var(--border-subtle)", color: "var(--foreground)" }}
-          placeholder="贵州茅台"
-          value={form.stockName}
-          onChange={(e) => set("stockName", e.target.value)}
+        <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>股票（输入代码或名称搜索）</label>
+        <StockCombobox
+          initialCode={form.stockCode}
+          initialName={form.stockName}
+          onSelect={(stock: StockItem) => {
+            setForm((p) => ({ ...p, stockCode: stock.code, stockName: stock.name, stockMarket: stock.market }));
+            setErrors((e) => { const n = { ...e }; delete n.stockCode; delete n.stockName; return n; });
+          }}
         />
-        {errors.stockName && <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stockName}</p>}
+        {(errors.stockCode || errors.stockName) && (
+          <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stockCode || errors.stockName}</p>
+        )}
+        {form.stockCode && (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs font-mono" style={{ color: "var(--brand-blue)" }}>{form.stockCode}</span>
+            <span className="text-xs" style={{ color: "var(--foreground)" }}>{form.stockName}</span>
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+              style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "var(--muted-foreground)" }}
+            >
+              {form.stockMarket === "SH" ? "沪" : form.stockMarket === "SZ" ? "深" : "北"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Status */}

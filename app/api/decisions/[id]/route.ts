@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getDecisionById, updateDecision } from "@/lib/db/queries/decisions";
 import { z } from "zod";
 
@@ -13,13 +14,21 @@ const patchSchema = z.object({
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
-  const decision = await getDecisionById(id);
+  const decision = await getDecisionById(id, userId);
   if (!decision) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(decision);
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await params;
   const body: unknown = await req.json();
   const result = patchSchema.safeParse(body);
@@ -28,8 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   const patch = result.data;
-  // Auto-compute return30Days if we now have both actualPrice and priceAfter30Days
-  const existing = await getDecisionById(id);
+  const existing = await getDecisionById(id, userId);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const costBasis = patch.actualPrice ?? existing.actualPrice;
@@ -38,6 +46,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     patch.return30Days = Math.round(((p30 - costBasis) / costBasis) * 10000) / 100;
   }
 
-  const updated = await updateDecision(id, patch);
+  const updated = await updateDecision(id, userId, patch);
   return NextResponse.json(updated);
 }

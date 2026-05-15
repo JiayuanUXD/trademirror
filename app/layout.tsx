@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/shared/sidebar";
-import { Navbar } from "@/components/shared/navbar";
 
 export const metadata: Metadata = {
   title: "TradeMirror · 你的交易之镜",
@@ -15,12 +13,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" className="h-full antialiased">
-      <body className="h-full flex flex-col" style={{ backgroundColor: "var(--surface-base)" }}>
-        <Navbar />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto">{children}</main>
-        </div>
+      <body className="h-full" style={{ backgroundColor: "var(--surface-base)" }}>
+        {children}
       </body>
     </html>
   );

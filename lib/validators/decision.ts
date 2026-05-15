@@ -31,6 +31,7 @@ export const step1Schema = z.object({
     .string()
     .min(1, "请填写理由")
     .max(30, "理由最多30字"),
+  tradedAt: z.number().optional(),
 });
 
 export const step2Schema = z.object({

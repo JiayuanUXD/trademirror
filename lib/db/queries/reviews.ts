@@ -15,14 +15,19 @@ function buildDefaultItems(tradeCount: number): DisciplineItem[] {
 }
 
 async function attachStats(
-  row: typeof weeklyReviews.$inferSelect
+  row: typeof weeklyReviews.$inferSelect,
+  userId: string
 ): Promise<WeeklyReview> {
   const items = JSON.parse(row.disciplineItems) as DisciplineItem[];
 
   const weekDecisions = await db
     .select()
     .from(decisions)
-    .where(and(gte(decisions.createdAt, row.weekStart), lte(decisions.createdAt, row.weekEnd)));
+    .where(and(
+      gte(decisions.createdAt, row.weekStart),
+      lte(decisions.createdAt, row.weekEnd),
+      eq(decisions.userId, userId),
+    ));
 
   const weekDecisionCount = weekDecisions.length;
   const dangerTradeCount = weekDecisions.filter(
@@ -39,43 +44,49 @@ async function attachStats(
   };
 }
 
-export async function getReviews(): Promise<WeeklyReview[]> {
+export async function getReviews(userId: string): Promise<WeeklyReview[]> {
   const rows = await db
     .select()
     .from(weeklyReviews)
+    .where(eq(weeklyReviews.userId, userId))
     .orderBy(desc(weeklyReviews.weekStart));
-  return Promise.all(rows.map(attachStats));
+  return Promise.all(rows.map((r) => attachStats(r, userId)));
 }
 
-export async function getReviewById(id: string): Promise<WeeklyReview | null> {
+export async function getReviewById(id: string, userId: string): Promise<WeeklyReview | null> {
   const rows = await db
     .select()
     .from(weeklyReviews)
-    .where(eq(weeklyReviews.id, id))
+    .where(and(eq(weeklyReviews.id, id), eq(weeklyReviews.userId, userId)))
     .limit(1);
-  return rows[0] ? attachStats(rows[0]) : null;
+  return rows[0] ? attachStats(rows[0], userId) : null;
 }
 
 export async function getReviewByWeekStart(
-  weekStart: number
+  weekStart: number,
+  userId: string
 ): Promise<WeeklyReview | null> {
   const rows = await db
     .select()
     .from(weeklyReviews)
-    .where(eq(weeklyReviews.weekStart, weekStart))
+    .where(and(eq(weeklyReviews.weekStart, weekStart), eq(weeklyReviews.userId, userId)))
     .limit(1);
-  return rows[0] ? attachStats(rows[0]) : null;
+  return rows[0] ? attachStats(rows[0], userId) : null;
 }
 
 export async function createReview(
   weekStart: number,
-  weekEnd: number
+  weekEnd: number,
+  userId: string
 ): Promise<WeeklyReview> {
-  // Get trade count for this week to pre-fill auto suggestions
   const weekDecisions = await db
     .select()
     .from(decisions)
-    .where(and(gte(decisions.createdAt, weekStart), lte(decisions.createdAt, weekEnd)));
+    .where(and(
+      gte(decisions.createdAt, weekStart),
+      lte(decisions.createdAt, weekEnd),
+      eq(decisions.userId, userId),
+    ));
 
   const defaultItems = buildDefaultItems(weekDecisions.length);
   const now = Date.now();
@@ -84,6 +95,7 @@ export async function createReview(
     id: crypto.randomUUID(),
     weekStart,
     weekEnd,
+    userId,
     status: "DRAFT" as const,
     bestThing: "",
     worstThing: "",
@@ -95,13 +107,14 @@ export async function createReview(
   };
 
   await db.insert(weeklyReviews).values(row);
-  const created = await getReviewById(row.id);
+  const created = await getReviewById(row.id, userId);
   if (!created) throw new Error("Failed to create review");
   return created;
 }
 
 export async function updateReview(
   id: string,
+  userId: string,
   patch: {
     bestThing?: string;
     worstThing?: string;
@@ -124,8 +137,8 @@ export async function updateReview(
     set.completedAt = Date.now();
   }
 
-  await db.update(weeklyReviews).set(set).where(eq(weeklyReviews.id, id));
-  const updated = await getReviewById(id);
+  await db.update(weeklyReviews).set(set).where(and(eq(weeklyReviews.id, id), eq(weeklyReviews.userId, userId)));
+  const updated = await getReviewById(id, userId);
   if (!updated) throw new Error("Review not found");
   return updated;
 }

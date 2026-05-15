@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { patchReviewSchema, completeReviewSchema } from "@/lib/validators/review";
 import { getReviewById, updateReview } from "@/lib/db/queries/reviews";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
-    const review = await getReviewById(id);
+    const review = await getReviewById(id, userId);
     if (!review) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json(review);
   } catch (err) {
@@ -17,6 +22,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { id } = await params;
     const body: unknown = await req.json();
@@ -27,9 +36,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const data = parsed.data;
 
-    // If completing, run stricter validation
     if (data.complete) {
-      const existing = await getReviewById(id);
+      const existing = await getReviewById(id, userId);
       if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
       const fullData = {
@@ -45,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     }
 
-    const review = await updateReview(id, data);
+    const review = await updateReview(id, userId, data);
     return NextResponse.json(review);
   } catch (err) {
     console.error("[PATCH /api/reviews/[id]]", err);

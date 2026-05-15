@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Plus, FileText, AlertTriangle, CalendarDays, Clock } from "lucide-react";
+import { auth } from "@/auth";
 import { getDecisions } from "@/lib/db/queries/decisions";
 import { getHoldings } from "@/lib/db/queries/holdings";
 import { getReviews, getReviewByWeekStart, createReview } from "@/lib/db/queries/reviews";
@@ -95,15 +96,19 @@ function DashboardSkeleton() {
 }
 
 async function DashboardContent({ weekStart }: { weekStart: number }) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
   const [decisions, holdings, reviews] = await Promise.all([
-    getDecisions(500),
-    getHoldings(),
-    getReviews(),
+    getDecisions(userId, 500),
+    getHoldings(userId),
+    getReviews(userId),
   ]);
 
   const weekEnd = getWeekEnd(dayjs(weekStart)).valueOf();
-  let currentReview = await getReviewByWeekStart(weekStart);
-  if (!currentReview) currentReview = await createReview(weekStart, weekEnd);
+  let currentReview = await getReviewByWeekStart(weekStart, userId);
+  if (!currentReview) currentReview = await createReview(weekStart, weekEnd, userId);
 
   const weekDecisions = decisions.filter(
     (d) => d.createdAt >= weekStart && d.createdAt <= weekEnd

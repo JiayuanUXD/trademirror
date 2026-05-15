@@ -13,19 +13,28 @@ function monthBounds(year: number, month: number): { start: number; end: number 
 }
 
 async function attachStats(
-  row: typeof monthlyPortraits.$inferSelect
+  row: typeof monthlyPortraits.$inferSelect,
+  userId: string
 ): Promise<MonthlyPortrait> {
   const { start, end } = monthBounds(row.year, row.month);
 
   const monthDecisions = await db
     .select()
     .from(decisions)
-    .where(and(gte(decisions.createdAt, start), lte(decisions.createdAt, end)));
+    .where(and(
+      gte(decisions.createdAt, start),
+      lte(decisions.createdAt, end),
+      eq(decisions.userId, userId),
+    ));
 
   const monthReviews = await db
     .select()
     .from(weeklyReviews)
-    .where(and(gte(weeklyReviews.weekStart, start), lte(weeklyReviews.weekStart, end)));
+    .where(and(
+      gte(weeklyReviews.weekStart, start),
+      lte(weeklyReviews.weekStart, end),
+      eq(weeklyReviews.userId, userId),
+    ));
 
   const n = monthDecisions.length;
   const dangerCount = monthDecisions.filter(
@@ -52,7 +61,6 @@ async function attachStats(
     : 0;
 
   const problemEvals = JSON.parse(row.problemEvals) as ProblemEvalItem[];
-  // Ensure all 6 problems have an entry
   const evalMap = new Map(problemEvals.map((p) => [p.id, p.eval]));
   const fullEvals: ProblemEvalItem[] = PROBLEM_IDS.map((id) => ({
     id,
@@ -79,36 +87,47 @@ async function attachStats(
   };
 }
 
-export async function getPortraits(): Promise<MonthlyPortrait[]> {
+export async function getPortraits(userId: string): Promise<MonthlyPortrait[]> {
   const rows = await db
     .select()
     .from(monthlyPortraits)
+    .where(eq(monthlyPortraits.userId, userId))
     .orderBy(desc(monthlyPortraits.year), desc(monthlyPortraits.month));
-  return Promise.all(rows.map(attachStats));
+  return Promise.all(rows.map((r) => attachStats(r, userId)));
 }
 
-export async function getPortraitById(id: string): Promise<MonthlyPortrait | null> {
-  const rows = await db.select().from(monthlyPortraits).where(eq(monthlyPortraits.id, id)).limit(1);
-  return rows[0] ? attachStats(rows[0]) : null;
+export async function getPortraitById(id: string, userId: string): Promise<MonthlyPortrait | null> {
+  const rows = await db
+    .select()
+    .from(monthlyPortraits)
+    .where(and(eq(monthlyPortraits.id, id), eq(monthlyPortraits.userId, userId)))
+    .limit(1);
+  return rows[0] ? attachStats(rows[0], userId) : null;
 }
 
 export async function getPortraitByYearMonth(
   year: number,
-  month: number
+  month: number,
+  userId: string
 ): Promise<MonthlyPortrait | null> {
   const rows = await db
     .select()
     .from(monthlyPortraits)
-    .where(and(eq(monthlyPortraits.year, year), eq(monthlyPortraits.month, month)))
+    .where(and(
+      eq(monthlyPortraits.year, year),
+      eq(monthlyPortraits.month, month),
+      eq(monthlyPortraits.userId, userId),
+    ))
     .limit(1);
-  return rows[0] ? attachStats(rows[0]) : null;
+  return rows[0] ? attachStats(rows[0], userId) : null;
 }
 
-export async function createPortrait(year: number, month: number): Promise<MonthlyPortrait> {
+export async function createPortrait(year: number, month: number, userId: string): Promise<MonthlyPortrait> {
   const row = {
     id: crypto.randomUUID(),
     year,
     month,
+    userId,
     status: "DRAFT" as const,
     reflection: "",
     nextFocus: "",
@@ -117,13 +136,14 @@ export async function createPortrait(year: number, month: number): Promise<Month
     completedAt: null,
   };
   await db.insert(monthlyPortraits).values(row);
-  const created = await getPortraitById(row.id);
+  const created = await getPortraitById(row.id, userId);
   if (!created) throw new Error("Failed to create portrait");
   return created;
 }
 
 export async function updatePortrait(
   id: string,
+  userId: string,
   patch: {
     reflection?: string;
     nextFocus?: string;
@@ -137,8 +157,8 @@ export async function updatePortrait(
   if (patch.problemEvals !== undefined) set.problemEvals = JSON.stringify(patch.problemEvals);
   if (patch.complete) { set.status = "COMPLETED"; set.completedAt = Date.now(); }
 
-  await db.update(monthlyPortraits).set(set).where(eq(monthlyPortraits.id, id));
-  const updated = await getPortraitById(id);
+  await db.update(monthlyPortraits).set(set).where(and(eq(monthlyPortraits.id, id), eq(monthlyPortraits.userId, userId)));
+  const updated = await getPortraitById(id, userId);
   if (!updated) throw new Error("Portrait not found");
   return updated;
 }

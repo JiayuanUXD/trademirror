@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { z } from "zod";
 import {
   getCalmStats,
@@ -23,13 +24,16 @@ export type DangerAlert = {
   signal: DangerAlertSignal;
   title: string;
   message: string;
-  /** "你过去 14 次操作有 10 次亏损" 这类用户自己的历史数据 */
   history: string | null;
 };
 
 const FREQUENT_THRESHOLD_MIN = 120;
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body: unknown = await req.json();
     const parsed = preCheckSchema.safeParse(body);
@@ -44,7 +48,7 @@ export async function POST(req: NextRequest) {
     const alerts: DangerAlert[] = [];
 
     if (fomoScore >= 7) {
-      const stats = await getFomoStats();
+      const stats = await getFomoStats(userId);
       alerts.push({
         signal: "FOMO_HIGH",
         title: "FOMO 评分偏高",
@@ -57,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (calmScore <= 4) {
-      const stats = await getCalmStats();
+      const stats = await getCalmStats(userId);
       alerts.push({
         signal: "CALM_LOW",
         title: "心态不稳",
@@ -70,7 +74,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (systemAlignment === "NOT_ALIGN") {
-      const stats = await getNotAlignThisMonth();
+      const stats = await getNotAlignThisMonth(userId);
       const note =
         stats.total === 0
           ? "本月还没有其他不符合体系的操作——不要让这笔成为开头。"
@@ -83,7 +87,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const recent = await getMostRecentDecision();
+    const recent = await getMostRecentDecision(userId);
     if (recent && recent.minutesAgo < FREQUENT_THRESHOLD_MIN) {
       alerts.push({
         signal: "FREQUENT",

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { ProxyAgent, fetch as undiciFetch } from "undici";
 import { getDecisions } from "@/lib/db/queries/decisions";
 import { getReviews } from "@/lib/db/queries/reviews";
@@ -11,15 +12,21 @@ function makeDispatcher() {
 }
 
 export async function POST() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "未配置 DEEPSEEK_API_KEY" }, { status: 503 });
   }
 
   const [decisions, reviews, holdings] = await Promise.all([
-    getDecisions(200),
-    getReviews(),
-    getHoldings(),
+    getDecisions(userId, 200),
+    getReviews(userId),
+    getHoldings(userId),
   ]);
 
   const ctx = buildInsightContext(decisions, reviews, holdings, 30);

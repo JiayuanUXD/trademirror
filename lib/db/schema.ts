@@ -1,8 +1,63 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, primaryKey, uniqueIndex } from "drizzle-orm/sqlite-core";
+
+// ─── NextAuth Adapter Tables ─────────────────────────────────────────────────
+
+export const users = sqliteTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  email: text("email").notNull(),
+  emailVerified: integer("emailVerified", { mode: "timestamp_ms" }),
+  image: text("image"),
+  role: text("role").notNull().default("user"),
+  disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
+  passwordHash: text("password_hash"),
+  passwordChangedAt: integer("password_changed_at"),
+  createdAt: integer("created_at").notNull().$defaultFn(() => Date.now()),
+});
+
+export const accounts = sqliteTable(
+  "account",
+  {
+    userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").$type<"oauth" | "oidc" | "email" | "credentials">().notNull(),
+    provider: text("provider").notNull(),
+    providerAccountId: text("providerAccountId").notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: text("token_type"),
+    scope: text("scope"),
+    id_token: text("id_token"),
+    session_state: text("session_state"),
+  },
+  (account) => ({
+    compositePk: primaryKey({ columns: [account.provider, account.providerAccountId] }),
+  })
+);
+
+export const sessions = sqliteTable("session", {
+  sessionToken: text("sessionToken").primaryKey(),
+  userId: text("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const verificationTokens = sqliteTable(
+  "verificationToken",
+  {
+    identifier: text("identifier").notNull(),
+    token: text("token").notNull(),
+    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+  },
+  (vt) => ({
+    compositePk: primaryKey({ columns: [vt.identifier, vt.token] }),
+  })
+);
+
+// ─── Business Tables ─────────────────────────────────────────────────────────
 
 export const weeklyReviews = sqliteTable("weekly_reviews", {
   id: text("id").primaryKey(),
-  weekStart: integer("week_start").notNull().unique(),
+  weekStart: integer("week_start").notNull(),
   weekEnd: integer("week_end").notNull(),
   status: text("status").$type<"DRAFT" | "COMPLETED">().notNull().default("DRAFT"),
   bestThing: text("best_thing").notNull().default(""),
@@ -12,7 +67,10 @@ export const weeklyReviews = sqliteTable("weekly_reviews", {
   disciplineTotal: integer("discipline_total").notNull().default(0),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
-});
+  userId: text("user_id").notNull(),
+}, (table) => ({
+  weekStartUserUnique: uniqueIndex("idx_weekly_reviews_week_user").on(table.weekStart, table.userId),
+}));
 
 export const holdings = sqliteTable("holdings", {
   id: text("id").primaryKey(),
@@ -29,6 +87,7 @@ export const holdings = sqliteTable("holdings", {
   exitConditions: text("exit_conditions").notNull(),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+  userId: text("user_id").notNull(),
 });
 
 export const monthlyPortraits = sqliteTable("monthly_portraits", {
@@ -41,7 +100,10 @@ export const monthlyPortraits = sqliteTable("monthly_portraits", {
   problemEvals: text("problem_evals").notNull().default("[]"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
-});
+  userId: text("user_id").notNull(),
+}, (table) => ({
+  yearMonthUserUnique: uniqueIndex("idx_monthly_portraits_year_month_user").on(table.year, table.month, table.userId),
+}));
 
 export const goals = sqliteTable("goals", {
   id: text("id").primaryKey(),
@@ -49,13 +111,14 @@ export const goals = sqliteTable("goals", {
   startAmount: real("start_amount").notNull(),
   targetAmount: real("target_amount").notNull(),
   years: integer("years").notNull(),
-  requiredReturn: real("required_return").notNull(), // 年化收益率（小数）
-  realismScore: integer("realism_score").notNull(),  // 1-5
+  requiredReturn: real("required_return").notNull(),
+  realismScore: integer("realism_score").notNull(),
   status: text("status").$type<"ACTIVE" | "ACHIEVED" | "ABANDONED">().notNull().default("ACTIVE"),
   note: text("note").notNull().default(""),
-  checkins: text("checkins").notNull().default("[]"), // JSON: {date, amount, note}[]
+  checkins: text("checkins").notNull().default("[]"),
   createdAt: integer("created_at").notNull(),
   targetDate: integer("target_date").notNull(),
+  userId: text("user_id").notNull(),
 });
 
 export const errorTypes = sqliteTable("error_types", {
@@ -64,6 +127,7 @@ export const errorTypes = sqliteTable("error_types", {
   description: text("description").notNull().default(""),
   isPreset: integer("is_preset", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
+  userId: text("user_id").notNull(),
 });
 
 export const errorLogs = sqliteTable("error_logs", {
@@ -71,8 +135,9 @@ export const errorLogs = sqliteTable("error_logs", {
   errorTypeId: text("error_type_id").notNull(),
   decisionId: text("decision_id"),
   note: text("note").notNull().default(""),
-  cost: real("cost"), // 负数 = 亏损金额（元），null 表示未知
+  cost: real("cost"),
   occurredAt: integer("occurred_at").notNull(),
+  userId: text("user_id").notNull(),
 });
 
 export const decisions = sqliteTable("decisions", {
@@ -87,7 +152,6 @@ export const decisions = sqliteTable("decisions", {
   quantity: integer("quantity").notNull(),
   amount: real("amount").notNull(),
   reason: text("reason").notNull(),
-  // JSON arrays stored as text
   basis: text("basis").notNull(),
   systemAlignment: text("system_alignment")
     .$type<"ALIGN" | "PARTIAL" | "NOT_ALIGN">()
@@ -105,6 +169,7 @@ export const decisions = sqliteTable("decisions", {
   postReflection: text("post_reflection"),
   isArchived: integer("is_archived", { mode: "boolean" }).default(false).notNull(),
   createdAt: integer("created_at").notNull(),
+  userId: text("user_id").notNull(),
 });
 
 export const settings = sqliteTable("settings", {
@@ -114,4 +179,5 @@ export const settings = sqliteTable("settings", {
   weeklyTradeLimit: integer("weekly_trade_limit").notNull().default(2),
   defaultStopLossPct: integer("default_stop_loss_pct").notNull().default(10),
   totalCapital: real("total_capital").notNull().default(0),
+  userId: text("user_id").notNull(),
 });

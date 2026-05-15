@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { createHoldingSchema } from "@/lib/validators/holding";
 import { createHolding, getHoldings } from "@/lib/db/queries/holdings";
 
 export async function GET() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    const list = await getHoldings();
+    const list = await getHoldings(userId);
     return NextResponse.json(list);
   } catch (err) {
     console.error("[GET /api/holdings]", err);
@@ -13,6 +18,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body: unknown = await req.json();
     const parsed = createHoldingSchema.safeParse(body);
@@ -49,7 +58,7 @@ export async function POST(req: NextRequest) {
       exitConditions: [],
       createdAt: now,
       updatedAt: now,
-    });
+    }, userId);
 
     return NextResponse.json(holding, { status: 201 });
   } catch (err) {

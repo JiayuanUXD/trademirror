@@ -5,7 +5,64 @@
 **项目简介**：A股个人交易日志 Web 应用。帮用户看清自己的交易行为模式，而非预测市场。
 **线上地址**：https://trademirror-sand.vercel.app
 **本地开发**：`pnpm dev --port 5001`
-**技术栈**：Next.js 14 App Router · TypeScript · Tailwind · Drizzle ORM · libSQL（Turso）
+**技术栈**：Next.js 16 App Router · TypeScript · Tailwind · Drizzle ORM · libSQL（Turso） · NextAuth v5
+
+---
+
+## 2026-05-15
+
+### 用户认证系统上线（Phase 1-3）
+- **多用户认证**：NextAuth v5 + JWT 策略，支持邮箱密码登录和 Google OAuth
+- **数据隔离**：全部 8 张业务表新增 `userId` 字段，所有查询按用户过滤
+- **管理员后台**：`/admin/users`（用户列表）、`/admin/users/[id]`（只读数据查看）、`/admin/stats`（全局统计）
+- **初始管理员账号**：`jiayuan@trademirror.local` / `admin123`，首次登录强制改密
+- **路由重组**：页面迁移到 `app/(auth)/` 和 `app/(main)/` 路由组，middleware 统一鉴权
+
+### 功能增强
+- **股票代码自动补全**：`components/shared/stock-combobox.tsx`，接入东方财富 suggest API + 用户历史记录缓存
+- **历史交易补录**：决策卡表单新增日期时间选择器，支持录入过去的交易
+- **README 重写**：项目概述、技术栈、环境变量指南、目录结构、部署记录
+
+### 代码审查与部署
+- TypeScript 零错误
+- 清理路由迁移遗留的 15 个旧页面文件（`app/decisions/` 等，已迁移到 `app/(main)/`）
+- 补充 Vercel 环境变量 `AUTH_SECRET`（NextAuth v5 主变量名）
+- 成功部署 v0.3 到 https://trademirror-sand.vercel.app
+
+### ⚠️ 部署踩坑复盘
+
+本次部署耗时约 40 分钟排障，记录三个独立问题，避免将来重复踩坑：
+
+**问题 1：Git push 认证失败**
+- 现象：`git push` → `fatal: could not read Username for 'https://github.com'`
+- 原因：remote URL 用的是 HTTPS，macOS 终端没有 credential helper
+- 解法：`git remote set-url origin git@github.com:JiayuanUXD/trademirror.git`
+- ✅ 已修复：remote 已永久切换为 SSH
+
+**问题 2：Vercel 部署永久 BLOCKED（核心问题，耗时最长）**
+- 现象：`vercel deploy --prod` 只上传 2.6KB，部署状态永远卡在 BLOCKED/UNKNOWN
+- 排查过程：
+  1. 初以为是并发限制 → 清除了所有卡住的部署，无效
+  2. 检查 Node.js 24.x 版本 → 降级到 22.x，无效
+  3. 检查 Deployment Protection / project settings → 全部正常
+  4. 通过 Vercel API 发现 `readyState: "BLOCKED"` 且 `link: {}` 为空（无 GitHub 集成）
+  5. 检查 GitHub webhooks → 空列表，确认没有 Vercel GitHub App
+- 根因：**GitHub 仓库是私有的**。Vercel CLI 创建部署时通过文件去重只上传增量（2.6KB），构建时需从 GitHub 拉取完整代码，但没有权限访问私有仓库 → 构建永远启动不了 → BLOCKED
+- 解法：用户将 GitHub 仓库改为公开，部署立刻成功
+- 教训：
+  - Vercel 的 BLOCKED 状态没有给出任何错误信息（`errorCode: null, errorMessage: null`），排查非常困难
+  - `vercel ls` 显示 "UNKNOWN" 而非 "BLOCKED"，隐藏了真实状态，需要用 API 才能看到
+  - 多次重试会创建多个 BLOCKED 部署，Hobby 计划的并发限制（1 个构建）导致后续部署也被阻塞，形成恶性循环
+- ✅ 预防清单：
+  1. 部署前确认 GitHub 仓库权限（公开 or 已安装 Vercel GitHub App）
+  2. 如果 `vercel deploy` 上传体积异常小（< 100KB），大概率是 Git 拉取问题
+  3. 遇到 BLOCKED 用 `vercel inspect` 或 API 查真实状态，不要只看 `vercel ls`
+  4. 不要反复重试——先 `vercel remove` 清除卡住的部署再重新来
+
+**问题 3：Node.js 版本过新**
+- 现象：Vercel 项目默认 Node.js 24.x，构建有 punycode 废弃警告
+- 解法：通过 API `PATCH /v9/projects/{id}` 降级到 22.x LTS
+- ✅ 预防：新项目固定用 LTS 版本（当前 22.x），不要用最新大版本
 
 ---
 

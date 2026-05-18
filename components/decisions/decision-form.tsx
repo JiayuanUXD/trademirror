@@ -80,6 +80,8 @@ export function DecisionForm() {
     stopLossPrice: "",
     systemAlignment: "ALIGN",
   });
+  const [stopLossMode, setStopLossMode] = useState<"pct" | "price">("pct");
+  const [stopLossPercent, setStopLossPercent] = useState<string>("");
 
   function clearError(key: string) {
     setErrors((e) => {
@@ -544,27 +546,96 @@ export function DecisionForm() {
       {step === 2 && (
         <div className="space-y-4">
           {/* Stop loss */}
-          <div className="space-y-1">
-            <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              预设止损价（元）
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="w-full h-9 px-3 rounded-md text-sm border"
-              style={{
-                backgroundColor: "var(--surface-overlay)",
-                borderColor: errors.stopLossPrice ? "var(--brand-red)" : "var(--border-subtle)",
-                color: "var(--foreground)",
-              }}
-              placeholder="1700.00"
-              value={s3.stopLossPrice}
-              onChange={(e) => {
-                setS3((p) => ({ ...p, stopLossPrice: e.target.value }));
-                clearError("stopLossPrice");
-              }}
-            />
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                预设止损
+              </label>
+              <div
+                className="flex rounded-md overflow-hidden text-[11px]"
+                style={{ border: "1px solid var(--border-subtle)" }}
+              >
+                {(["pct", "price"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setStopLossMode(m)}
+                    className="px-2.5 py-1 transition-colors"
+                    style={{
+                      backgroundColor: stopLossMode === m ? "var(--brand-blue)" : "var(--surface-overlay)",
+                      color: stopLossMode === m ? "#fff" : "var(--muted-foreground)",
+                    }}
+                  >
+                    {m === "pct" ? "按比例" : "按价格"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {stopLossMode === "pct" ? (
+              <div className="space-y-1">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="50"
+                    step="0.5"
+                    className="w-full h-9 px-3 pr-8 rounded-md text-sm border"
+                    style={{
+                      backgroundColor: "var(--surface-overlay)",
+                      borderColor: errors.stopLossPrice ? "var(--brand-red)" : "var(--border-subtle)",
+                      color: "var(--foreground)",
+                    }}
+                    placeholder="8"
+                    value={stopLossPercent}
+                    onChange={(e) => {
+                      setStopLossPercent(e.target.value);
+                      const pct = parseFloat(e.target.value);
+                      const entryPrice = Number(s1.price);
+                      if (!isNaN(pct) && pct > 0 && entryPrice > 0) {
+                        setS3((p) => ({ ...p, stopLossPrice: (entryPrice * (1 - pct / 100)).toFixed(2) }));
+                      } else {
+                        setS3((p) => ({ ...p, stopLossPrice: "" }));
+                      }
+                      clearError("stopLossPrice");
+                    }}
+                  />
+                  <span
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none select-none"
+                    style={{ color: "var(--muted-foreground)" }}
+                  >
+                    %
+                  </span>
+                </div>
+                {s3.stopLossPrice && (
+                  <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+                    对应止损价：
+                    <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
+                      ¥{Number(s3.stopLossPrice).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}
+                    </span>
+                  </p>
+                )}
+              </div>
+            ) : (
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full h-9 px-3 rounded-md text-sm border"
+                style={{
+                  backgroundColor: "var(--surface-overlay)",
+                  borderColor: errors.stopLossPrice ? "var(--brand-red)" : "var(--border-subtle)",
+                  color: "var(--foreground)",
+                }}
+                placeholder="1700.00"
+                value={s3.stopLossPrice}
+                onChange={(e) => {
+                  setS3((p) => ({ ...p, stopLossPrice: e.target.value }));
+                  clearError("stopLossPrice");
+                }}
+              />
+            )}
+
             {errors.stopLossPrice && (
               <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stopLossPrice}</p>
             )}
@@ -662,13 +733,11 @@ export function DecisionForm() {
             type="button"
             onClick={attemptSubmit}
             disabled={isSubmitting}
-            className="flex-1 h-10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+            className="flex-1 h-10 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
             style={{ backgroundColor: "var(--brand-blue)" }}
           >
             {isSubmitting ? "提交中…" : (
-              <span className="flex items-center gap-1.5">
-                <CheckCircle size={16} /> 记录这笔决策
-              </span>
+              <><CheckCircle size={16} /> 记录这笔决策</>
             )}
           </button>
         )}

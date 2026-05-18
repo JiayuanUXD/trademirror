@@ -9,6 +9,34 @@
 
 ---
 
+## 2026-05-18
+
+### 决策卡查看体验优化
+- **右侧抽屉查看**：决策卡列表页（`/decisions`）由"点击卡片跳转详情页"改为"点击卡片弹出右侧 Sheet 抽屉"，无需离开列表即可浏览完整信息
+  - 新建 `components/decisions/decisions-list.tsx`：抽取列表渲染逻辑为 Client Component，持有 `selectedId` 状态
+  - 新建 `components/decisions/decision-sheet.tsx`：右侧 Sheet 面板，并行拉取 `/api/decisions/[id]`、`/api/decisions/[id]/errors`、`/api/errors`，渲染决策详情、情绪评分、价格跟踪（DecisionTracking）、错误标记（ErrorTagger）
+  - Sheet 行为：ESC 关闭、点击遮罩关闭、锁定 body 滚动；顶部"独立页面"按钮保留原有 `/decisions/[id]` 跳转
+  - `app/(main)/decisions/page.tsx` 简化为纯 Server Component，数据获取后直接传入 `<DecisionsList>`
+
+### 决策表单止损输入改版
+- **按比例 / 按价格切换**（`components/decisions/decision-form.tsx` Step 3）
+  - 新增 `stopLossMode`（`"pct" | "price"`）和 `stopLossPercent` 本地状态，默认"按比例"
+  - 按比例模式：输入跌幅百分比（如 `8`），自动计算对应止损价 `= 入场价 × (1 - pct%)`，下方实时显示"对应止损价：¥xxx"
+  - 按价格模式：保留原有绝对价格输入框
+  - 两种模式最终提交字段不变（`stopLossPrice` 绝对价格）
+- **提交按钮居中修复**：`记录这笔决策` 按钮加 `flex items-center justify-center gap-1.5`，图标与文字不再偏左
+
+### 周复盘门禁优化
+- `/decisions/new` 在上周复盘未完成（DRAFT 状态）时，展示两条路径：
+  - 主路径（蓝色）→ 直接完成上周复盘
+  - 次路径 → 进入 `?mode=backfill` 补录历史交易（显示橙色提示条，引导完成后回去复盘）
+
+### 管理员角色管理交互优化
+- 用户管理页角色变更改为"下拉选择 + 二次确认弹窗"，防止误操作
+- 确认弹窗显示用户名和新角色，不允许修改自己的角色（按钮置灰 + 提示）
+
+---
+
 ## 2026-05-15
 
 ### 用户认证系统上线（Phase 1-3）

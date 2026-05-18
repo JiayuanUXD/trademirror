@@ -13,18 +13,18 @@ export async function PATCH(_req: Request, { params }: Params) {
   }
 
   const { id } = await params;
-  const [target] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
 
+  // Prevent self-disable
+  if (session.user.id === id) {
+    return NextResponse.json({ error: "Cannot disable your own account" }, { status: 400 });
+  }
+
+  const [target] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   if (!target) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const newDisabled = !target.disabled;
   await db.update(users).set({ disabled: newDisabled }).where(eq(users.id, id));
-
   return NextResponse.json({ ok: true, disabled: newDisabled });
 }

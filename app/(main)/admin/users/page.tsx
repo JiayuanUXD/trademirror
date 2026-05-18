@@ -10,5 +10,5 @@ export default async function AdminUsersPage() {
 
   const users = await getAllUsers();
 
-  return <UserListClient users={users} />;
+  return <UserListClient users={users} currentUserId={session.user.id} />;
 }

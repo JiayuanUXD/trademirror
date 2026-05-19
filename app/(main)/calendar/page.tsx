@@ -27,19 +27,26 @@ const ACTION_LABELS: Record<Decision["action"], string> = {
 const BUY_ACTIONS = new Set<Decision["action"]>(["BUY", "ADD"]);
 
 function actionColor(action: Decision["action"]) {
-  return BUY_ACTIONS.has(action) ? "var(--color-up)" : "var(--color-down)";
+  if (action === "BUY")    return "var(--color-up)";
+  if (action === "ADD")    return "var(--color-up)";
+  if (action === "CLEAR")  return "var(--color-down)";
+  return "var(--color-down)";
 }
 
 function actionBg(action: Decision["action"]) {
-  return BUY_ACTIONS.has(action)
-    ? "rgba(var(--color-up-rgb, 239,68,68), 0.10)"
-    : "rgba(var(--color-down-rgb, 34,197,94), 0.10)";
+  if (action === "BUY")    return "rgba(239,68,68, 0.14)";
+  if (action === "ADD")    return "rgba(239,68,68, 0.06)";   // 浅
+  if (action === "CLEAR")  return "rgba(34,197,94, 0.14)";
+  if (action === "SELL")   return "rgba(34,197,94, 0.14)";
+  return "rgba(34,197,94, 0.06)";                            // REDUCE 浅
 }
 
 function actionBorder(action: Decision["action"]) {
-  return BUY_ACTIONS.has(action)
-    ? "rgba(var(--color-up-rgb, 239,68,68), 0.25)"
-    : "rgba(var(--color-down-rgb, 34,197,94), 0.25)";
+  if (action === "BUY")    return "rgba(239,68,68, 0.35)";
+  if (action === "ADD")    return "rgba(239,68,68, 0.18)";   // 浅
+  if (action === "CLEAR")  return "rgba(34,197,94, 0.35)";
+  if (action === "SELL")   return "rgba(34,197,94, 0.35)";
+  return "rgba(34,197,94, 0.18)";                            // REDUCE 浅
 }
 
 function isDangerous(d: Decision) {
@@ -140,8 +147,9 @@ export default function CalendarPage() {
               const isWeekend = date.day() === 0 || date.day() === 6;
 
               // Summary counts for the day
-              const buyCount  = dayDecisions.filter((d) => BUY_ACTIONS.has(d.action)).length;
-              const sellCount = dayDecisions.filter((d) => !BUY_ACTIONS.has(d.action)).length;
+              const buyCount    = dayDecisions.filter((d) => d.action === "BUY").length;
+              const addCount    = dayDecisions.filter((d) => d.action === "ADD").length;
+              const sellCount   = dayDecisions.filter((d) => !BUY_ACTIONS.has(d.action)).length;
 
               return (
                 <div key={date.toString()}
@@ -166,14 +174,20 @@ export default function CalendarPage() {
                       <div className="flex items-center gap-0.5">
                         {buyCount > 0 && (
                           <span className="text-[9px] leading-none px-1 py-0.5 rounded font-bold tabular-nums"
-                            style={{ backgroundColor: "rgba(var(--color-up-rgb,239,68,68),0.15)", color: "var(--color-up)" }}>
-                            +{buyCount}
+                            style={{ backgroundColor: "rgba(239,68,68,0.18)", color: "var(--color-up)" }}>
+                            买{buyCount}
+                          </span>
+                        )}
+                        {addCount > 0 && (
+                          <span className="text-[9px] leading-none px-1 py-0.5 rounded font-bold tabular-nums"
+                            style={{ backgroundColor: "rgba(239,68,68,0.08)", color: "var(--color-up)", opacity: 0.8 }}>
+                            加{addCount}
                           </span>
                         )}
                         {sellCount > 0 && (
                           <span className="text-[9px] leading-none px-1 py-0.5 rounded font-bold tabular-nums"
-                            style={{ backgroundColor: "rgba(var(--color-down-rgb,34,197,94),0.15)", color: "var(--color-down)" }}>
-                            -{sellCount}
+                            style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "var(--color-down)" }}>
+                            卖{sellCount}
                           </span>
                         )}
                       </div>
@@ -218,12 +232,20 @@ export default function CalendarPage() {
       <div className="flex items-center flex-wrap gap-x-5 gap-y-2 px-4 py-3 rounded-xl border text-[11px]"
         style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)", color: "var(--muted-foreground)" }}>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)" }} />
-          <span>买入 / 加仓</span>
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(239,68,68,0.14)", border: "1px solid rgba(239,68,68,0.35)" }} />
+          <span>买入</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.3)" }} />
-          <span>卖出 / 减仓 / 清仓</span>
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.18)" }} />
+          <span>加仓</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(34,197,94,0.14)", border: "1px solid rgba(34,197,94,0.35)" }} />
+          <span>卖出 / 清仓</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.18)" }} />
+          <span>减仓</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "var(--brand-warning)" }} />

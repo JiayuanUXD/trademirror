@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { batchCreateDecisions, type BatchInsertDecision } from "@/lib/db/queries/decisions";
 import { z } from "zod";
-import { nanoid } from "nanoid";
 
 function inferMarket(code: string): "SH" | "SZ" | "BJ" {
   if (/^6/.test(code)) return "SH";
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const items: BatchInsertDecision[] = parsed.data.trades.map((t) => ({
-    id: nanoid(),
+    id: crypto.randomUUID(),
     stockCode: t.stockCode,
     stockName: t.stockName,
     stockMarket: t.stockMarket ?? inferMarket(t.stockCode),

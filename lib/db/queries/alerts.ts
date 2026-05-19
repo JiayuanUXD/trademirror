@@ -4,7 +4,7 @@ import { computeAlerts } from "@/lib/alerts";
 
 export async function getAlertStats(userId: string) {
   const [decisions, holdings] = await Promise.all([
-    getDecisions(userId, 100),
+    getDecisions(userId, { limit: 100 }),
     getHoldings(userId),
   ]);
   const alerts = computeAlerts(decisions, holdings);

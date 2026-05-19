@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Lightbulb, CheckCircle } from "lucide-react";
 import { StockCombobox, StockItem } from "@/components/shared/stock-combobox";
 import { StepIndicator } from "./step-indicator";
@@ -17,6 +17,7 @@ import {
   type DecisionAction,
   type DecisionBasis,
   type SystemAlignment,
+  type StockMarket,
 } from "@/types/decision";
 
 type Step1State = {
@@ -52,11 +53,30 @@ const MARKET_OPTIONS: { value: "SH" | "SZ" | "BJ"; label: string }[] = [
 
 export function DecisionForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<DangerAlert[] | null>(null);
   const [watchlistBanner, setWatchlistBanner] = useState(false);
+  const [parentId, setParentId] = useState<string | null>(null);
+
+  // Pre-fill from URL params (child card)
+  useEffect(() => {
+    const pId = searchParams.get("parentId");
+    const stockCode = searchParams.get("stockCode");
+    const stockName = searchParams.get("stockName");
+    const stockMarket = searchParams.get("stockMarket") as StockMarket | null;
+    const action = searchParams.get("action") as DecisionAction | null;
+
+    if (pId) setParentId(pId);
+    if (stockCode && stockName && stockMarket) {
+      setS1((p) => ({ ...p, stockCode, stockName, stockMarket }));
+    }
+    if (action && Object.keys(ACTION_LABELS).includes(action)) {
+      setS1((p) => ({ ...p, action }));
+    }
+  }, [searchParams]);
 
   const [s1, setS1] = useState<Step1State>({
     stockCode: "",
@@ -82,6 +102,18 @@ export function DecisionForm() {
   });
   const [stopLossMode, setStopLossMode] = useState<"pct" | "price">("pct");
   const [stopLossPercent, setStopLossPercent] = useState<string>("");
+
+  // Recompute stopLossPrice when entry price changes in pct mode (Fix #4 & #11)
+  useEffect(() => {
+    if (stopLossMode !== "pct") return;
+    const pct = parseFloat(stopLossPercent);
+    const entryPrice = Number(s1.price);
+    if (!isNaN(pct) && pct > 0 && entryPrice > 0) {
+      setS3((p) => ({ ...p, stopLossPrice: (entryPrice * (1 - pct / 100)).toFixed(2) }));
+    } else {
+      setS3((p) => ({ ...p, stopLossPrice: "" }));
+    }
+  }, [s1.price, stopLossMode, stopLossPercent]);
 
   function clearError(key: string) {
     setErrors((e) => {
@@ -175,7 +207,7 @@ export function DecisionForm() {
   async function actuallySubmit() {
     setIsSubmitting(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         stockCode: s1.stockCode,
         stockName: s1.stockName,
         stockMarket: s1.stockMarket,
@@ -191,6 +223,7 @@ export function DecisionForm() {
         stopLossPrice: Number(s3.stopLossPrice),
         systemAlignment: s3.systemAlignment,
       };
+      if (parentId) payload.parentId = parentId;
 
       const res = await fetch("/api/decisions", {
         method: "POST",
@@ -267,7 +300,7 @@ export function DecisionForm() {
             <StockCombobox
               initialCode={s1.stockCode}
               initialName={s1.stockName}
-              onSelect={(stock: StockItem) => {
+              onSelect={async (stock: StockItem) => {
                 setS1((p) => ({
                   ...p,
                   stockCode: stock.code,
@@ -276,6 +309,17 @@ export function DecisionForm() {
                 }));
                 clearError("stockCode");
                 clearError("stockName");
+
+                // Auto-fetch current price
+                try {
+                  const res = await fetch(`/api/stocks/price?code=${stock.code}&market=${stock.market}`);
+                  if (res.ok) {
+                    const data = await res.json() as { price?: number };
+                    if (data.price) {
+                      setS1((p) => ({ ...p, price: data.price!.toFixed(2) }));
+                    }
+                  }
+                } catch { /* Silently fail — user can type price manually */ }
               }}
             />
             {(errors.stockCode || errors.stockName) && (

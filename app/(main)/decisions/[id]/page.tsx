@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
@@ -39,7 +39,7 @@ function ScoreBadge({ value, invert = false }: { value: number; invert?: boolean
 export default async function DecisionDetailPage({ params }: Props) {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) return null;
+  if (!userId) redirect("/login");
 
   const { id } = await params;
   const [decision, errorLogs, allErrorTypes] = await Promise.all([

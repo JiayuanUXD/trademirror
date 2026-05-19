@@ -113,7 +113,10 @@ const CREATE_TABLES = [
     return_30_days REAL,
     danger_signals TEXT NOT NULL,
     post_reflection TEXT,
-    is_archived INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    voided_reason TEXT,
+    voided_at INTEGER,
+    parent_id TEXT,
     created_at INTEGER NOT NULL,
     user_id TEXT NOT NULL
   )`,
@@ -166,8 +169,8 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_error_logs_decision ON error_logs(decision_id)`,
   `CREATE INDEX IF NOT EXISTS idx_error_logs_occurred ON error_logs(occurred_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_decisions_created_at ON decisions(created_at DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_decisions_fomo ON decisions(fomo_score, is_archived)`,
-  `CREATE INDEX IF NOT EXISTS idx_decisions_calm ON decisions(calm_score, is_archived)`,
+  `CREATE INDEX IF NOT EXISTS idx_decisions_fomo ON decisions(fomo_score, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_decisions_calm ON decisions(calm_score, status)`,
   `CREATE INDEX IF NOT EXISTS idx_decisions_alignment_created ON decisions(system_alignment, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_decisions_user ON decisions(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_holdings_user ON holdings(user_id)`,
@@ -191,6 +194,10 @@ const ALTER_TABLES: { table: string; column: string; def: string }[] = [
   { table: "error_types", column: "user_id", def: "TEXT NOT NULL DEFAULT 'jiayuan'" },
   { table: "error_logs", column: "user_id", def: "TEXT NOT NULL DEFAULT 'jiayuan'" },
   { table: "settings", column: "user_id", def: "TEXT NOT NULL DEFAULT 'jiayuan'" },
+  { table: "decisions", column: "status", def: "TEXT NOT NULL DEFAULT 'ACTIVE'" },
+  { table: "decisions", column: "voided_reason", def: "TEXT" },
+  { table: "decisions", column: "voided_at", def: "INTEGER" },
+  { table: "decisions", column: "parent_id", def: "TEXT" },
 ];
 
 // ─── Preset Error Types ─────────────────────────────────────────────────────
@@ -286,20 +293,36 @@ export async function runMigrations(): Promise<void> {
       await addColumnIfMissing(t.table, t.column, t.def);
     }
 
-    // Phase 3: Create indexes (columns guaranteed to exist now)
+    // Phase 3: Migrate isArchived → status (for DBs created before the status column)
+    try {
+      // Check if is_archived column still exists
+      const colCheck = await client.execute({
+        sql: `SELECT 1 FROM pragma_table_info('decisions') WHERE name='is_archived' LIMIT 1`,
+        args: [],
+      });
+      if (colCheck.rows.length > 0) {
+        await client.execute({
+          sql: `UPDATE decisions SET status = 'ARCHIVED' WHERE is_archived = 1 AND (status = 'ACTIVE' OR status IS NULL)`,
+          args: [],
+        });
+        console.log("[db] migrated isArchived → status");
+      }
+    } catch { /* is_archived column may not exist on fresh DBs */ }
+
+    // Phase 5: Create indexes (columns guaranteed to exist now)
     await client.batch(
       CREATE_INDEXES.map((sql) => ({ sql, args: [] })),
       "write"
     );
     console.log("[db] indexes ok");
 
-    // Phase 4: Fix unique constraints on tables created before multi-user support
+    // Phase 6: Fix unique constraints on tables created before multi-user support
     const weeklyReviewsDDL = CREATE_TABLES.find((s) => s.includes("weekly_reviews"))!;
     const monthlyPortraitsDDL = CREATE_TABLES.find((s) => s.includes("monthly_portraits"))!;
     await recreateTable("weekly_reviews", weeklyReviewsDDL);
     await recreateTable("monthly_portraits", monthlyPortraitsDDL);
 
-    // Phase 5: Seed data
+    // Phase 7: Seed data
     const now = Date.now();
 
     // Preset error types (INSERT OR IGNORE — idempotent)

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -17,7 +18,8 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function AdminUserDetailPage({ params }: Params) {
   const session = await auth();
-  if (!session?.user?.id || session.user.role !== "admin") return null;
+  if (!session?.user?.id) redirect("/login");
+  if (session.user.role !== "admin") redirect("/");
 
   const { id } = await params;
   const [targetUser] = await db
@@ -29,7 +31,7 @@ export default async function AdminUserDetailPage({ params }: Params) {
   if (!targetUser) notFound();
 
   const [decisions, holdings, reviews] = await Promise.all([
-    getDecisions(id, 200),
+    getDecisions(id, { limit: 200 }),
     getHoldings(id),
     getReviews(id),
   ]);

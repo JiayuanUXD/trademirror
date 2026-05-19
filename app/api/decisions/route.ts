@@ -3,18 +3,25 @@ import { auth } from "@/auth";
 import { createDecisionSchema } from "@/lib/validators/decision";
 import { createDecision, getDecisions } from "@/lib/db/queries/decisions";
 import { calcDangerSignals } from "@/lib/danger-signals";
+import type { DecisionStatus } from "@/types/decision";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
   return session?.user?.id ?? null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const list = await getDecisions(userId);
+    const statusParam = req.nextUrl.searchParams.get("status") as string | null;
+    const validStatuses = ["ACTIVE", "VOIDED", "ARCHIVED", "ALL"] as const;
+    const status = statusParam && validStatuses.includes(statusParam as typeof validStatuses[number])
+      ? statusParam as "ACTIVE" | "VOIDED" | "ARCHIVED" | "ALL"
+      : "ACTIVE";
+
+    const list = await getDecisions(userId, { status });
     return NextResponse.json(list);
   } catch (err) {
     console.error("[GET /api/decisions]", err);
@@ -49,6 +56,8 @@ export async function POST(req: NextRequest) {
       basis: data.basis,
     });
 
+    const rawBody = body as Record<string, unknown>;
+
     const decision = await createDecision({
       id: crypto.randomUUID(),
       stockCode: data.stockCode,
@@ -67,7 +76,7 @@ export async function POST(req: NextRequest) {
       stopLossPrice: data.stopLossPrice,
       maxAcceptableLoss,
       dangerSignals,
-      isArchived: false,
+      parentId: (rawBody.parentId as string) ?? null,
       createdAt: data.tradedAt || Date.now(),
     }, userId);
 

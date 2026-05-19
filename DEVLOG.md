@@ -35,6 +35,79 @@
 - 用户管理页角色变更改为"下拉选择 + 二次确认弹窗"，防止误操作
 - 确认弹窗显示用户名和新角色，不允许修改自己的角色（按钮置灰 + 提示）
 
+### P0: 股票搜索稳定性修复
+- **AbortController 防抖**：`stock-combobox.tsx` 引入 AbortController，用户快速输入时取消过期请求，消除 race condition
+- **网络失败降级**：fetch 失败时不再静默失败，下拉面板显示"搜索暂时不可用，请手动输入"
+- **LRU 缓存**：缓存最近 10 条搜索结果，网络异常时尝试部分匹配缓存数据
+- **移动端优化**：`onBlur` 加 150ms 延迟 + `suppressBlur` ref，防止移动端下拉菜单过早关闭
+
+### P1-a: 非理性依据增加"熟人/群友推荐"
+- `types/decision.ts`：`IrrationalBasis` 类型和 `IRRATIONAL_BASIS` 数组新增一项
+
+### P1-b: 决策卡操作链 + 作废机制
+- **数据模型变更**（`lib/db/schema.ts`）：
+  - `isArchived: boolean` → `status: text`（ACTIVE / VOIDED / ARCHIVED）
+  - 新增 `voidedReason`（nullable: INPUT_ERROR / DUPLICATE / NOT_MINE）
+  - 新增 `voidedAt`（nullable timestamp）
+  - 新增 `parentId`（nullable，自引用关联父卡）
+- **数据迁移**（`lib/db/migrate.ts`）：自动检测旧 `is_archived` 列，`is_archived=1` → `status='ARCHIVED'`
+- **作废 API**：`PATCH /api/decisions/[id]/void` — 30min 内可选原因，超时必选
+- **归档 API**：`PATCH /api/decisions/[id]/archive`
+- **决策列表增强**（`decisions-list.tsx`）：
+  - 状态筛选 Tab（全部/活跃/已作废/已归档）
+  - voided 卡灰色+删除线，archived 降低透明度
+- **Sheet 操作面板**（`decision-sheet.tsx`）：
+  - ACTIVE 买入卡：加仓/减仓/清仓/作废/归档 按钮组
+  - ACTIVE 卖出卡：作废/归档
+  - 作废确认弹窗：≤30min 一键确认，>30min 必选原因
+  - VOIDED/ARCHIVED 状态横幅
+- **操作链子卡**（`decision-form.tsx`）：读取 URL params（parentId/stockCode/stockName/stockMarket/action），点击"加仓/减仓/清仓"跳转表单并自动预填
+
+### P2: 自动填入当前价格
+- **新增** `app/api/stocks/price/route.ts`：调用东方财富实时行情 API，以 fen 为单位返回，转换为元
+- **StockCombobox 联动**：选择股票后自动 fetch `/api/stocks/price?code=&market=`，填入价格输入框
+
+## 2026-05-19
+
+### 代码审查修复（12项）
+
+根据 2026-05-18 代码审查结果，按优先级逐一修复：
+
+**Fix #1 — 决策列表刷新机制**
+- `components/decisions/decisions-list.tsx`：移除 `refreshKey` state 和 `window.location.reload()`
+- 改用 `useRouter().refresh()` 触发 Next.js 增量刷新，无白屏
+
+**Fix #4 & #11 — 止损百分比与入场价联动**
+- `components/decisions/decision-form.tsx`：新增 `useEffect` 监听 `s1.price`、`stopLossMode`、`stopLossPercent`
+- 入场价改变时自动重新计算止损价；切换至"按比例"模式且比例为空时清空止损价
+
+**Fix #5 — fetchData AbortController**
+- `components/decisions/decision-sheet.tsx`：`fetchData` 新增 `signal?: AbortSignal` 参数；`useEffect` 创建 `AbortController`，cleanup 时 `abort()`，防止快速切换时旧请求覆盖新数据
+
+**Fix #7 — Sheet 加载失败反馈**
+- `decision-sheet.tsx`：新增 `fetchError` state，fetch 失败时显示"加载失败，请重试"提示 + 重试按钮
+
+**Fix #8 — Sheet ARIA 无障碍**
+- `decision-sheet.tsx`：面板加 `role="dialog"` `aria-modal="true"` `aria-labelledby="decision-sheet-title"`；标题加 `id`；关闭按钮加 `aria-label="关闭"`
+
+**Fix #2 — void API 30分钟宽限期**
+- `app/api/decisions/[id]/void/route.ts`：先 `getDecisionById` 检查存在性和状态；`reason` 改为 `optional`，30min 内不填默认 `INPUT_ERROR`，超时必须提供 reason
+
+**Fix #3 — status 状态守卫**
+- `lib/db/queries/decisions.ts`：`voidDecision` 和 `archiveDecision` 的 WHERE 条件新增 `eq(decisions.status, "ACTIVE")`，防止重复 void/archive
+- `app/api/decisions/[id]/archive/route.ts`：先查库，不存在返回 404，非 ACTIVE 返回 409
+
+**Fix #6 — stocks/price 入参校验**
+- `app/api/stocks/price/route.ts`：新增 `/^\d{6}$/` 正则验证 `code`；校验 market 必须为 SH/SZ/BJ
+
+**Fix #9 — 认证守卫 redirect**
+- 6 个页面将 `return null` 替换为 `redirect()`：
+  - 未登录 → `redirect("/login")`：`decisions/page.tsx`、`decisions/new/page.tsx`、`decisions/[id]/page.tsx`
+  - 未登录 → `redirect("/login")`，非 admin → `redirect("/")`：`admin/users/page.tsx`、`admin/users/[id]/page.tsx`、`admin/stats/page.tsx`
+
+**Fix #10 — LRU 缓存命中时正确更新顺序**
+- `components/shared/stock-combobox.tsx`：缓存命中时先 `delete` 再 `set`，确保 Map 按 LRU 排序，不再退化为 FIFO
+
 ---
 
 ## 2026-05-15

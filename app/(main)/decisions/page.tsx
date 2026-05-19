@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getDecisions } from "@/lib/db/queries/decisions";
 import { DecisionsList } from "@/components/decisions/decisions-list";
@@ -9,9 +10,9 @@ export const dynamic = "force-dynamic";
 export default async function DecisionsPage() {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) return null;
+  if (!userId) redirect("/login");
 
-  const decisions = await getDecisions(userId);
+  const decisions = await getDecisions(userId, { status: "ALL", limit: 100 });
 
   return (
     <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-5">

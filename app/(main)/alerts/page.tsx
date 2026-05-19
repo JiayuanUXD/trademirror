@@ -12,7 +12,7 @@ export default async function AlertsPage() {
   if (!userId) return null;
 
   const [decisions, holdings] = await Promise.all([
-    getDecisions(userId, 200),
+    getDecisions(userId, { limit: 200 }),
     getHoldings(userId),
   ]);
 

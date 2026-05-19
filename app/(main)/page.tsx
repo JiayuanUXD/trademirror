@@ -101,7 +101,7 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
   if (!userId) return null;
 
   const [decisions, holdings, reviews] = await Promise.all([
-    getDecisions(userId, 500),
+    getDecisions(userId, { limit: 500 }),
     getHoldings(userId),
     getReviews(userId),
   ]);

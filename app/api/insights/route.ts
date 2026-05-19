@@ -24,7 +24,7 @@ export async function POST() {
   }
 
   const [decisions, reviews, holdings] = await Promise.all([
-    getDecisions(userId, 200),
+    getDecisions(userId, { limit: 200 }),
     getReviews(userId),
     getHoldings(userId),
   ]);

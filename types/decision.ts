@@ -22,7 +22,8 @@ export type IrrationalBasis =
   | "凭感觉"
   | "看到别人买卖"
   | "情绪驱动"
-  | "想试试看";
+  | "想试试看"
+  | "熟人/群友推荐";
 
 export type DecisionBasis = RationalBasis | IrrationalBasis;
 
@@ -40,6 +41,7 @@ export const IRRATIONAL_BASIS: IrrationalBasis[] = [
   "看到别人买卖",
   "情绪驱动",
   "想试试看",
+  "熟人/群友推荐",
 ];
 
 export type SystemAlignment = "ALIGN" | "PARTIAL" | "NOT_ALIGN";
@@ -55,6 +57,22 @@ export type DangerSignal =
   | "心态不稳"
   | "不符合体系"
   | "非理性决策依据";
+
+export type DecisionStatus = "ACTIVE" | "VOIDED" | "ARCHIVED";
+
+export const STATUS_LABELS: Record<DecisionStatus, string> = {
+  ACTIVE: "活跃",
+  VOIDED: "已作废",
+  ARCHIVED: "已归档",
+};
+
+export type VoidedReason = "INPUT_ERROR" | "DUPLICATE" | "NOT_MINE";
+
+export const VOIDED_REASON_LABELS: Record<VoidedReason, string> = {
+  INPUT_ERROR: "录入错误",
+  DUPLICATE: "重复提交",
+  NOT_MINE: "非本人操作",
+};
 
 export type Decision = {
   id: string;
@@ -79,11 +97,14 @@ export type Decision = {
   return30Days: number | null;
   dangerSignals: DangerSignal[];
   postReflection: string | null;
-  isArchived: boolean;
+  status: DecisionStatus;
+  voidedReason: VoidedReason | null;
+  voidedAt: number | null;
+  parentId: string | null;
   createdAt: number;
 };
 
 export type CreateDecisionInput = Omit<
   Decision,
-  "id" | "actualPrice" | "priceAfter7Days" | "priceAfter30Days" | "return30Days" | "postReflection" | "isArchived" | "createdAt"
+  "id" | "actualPrice" | "priceAfter7Days" | "priceAfter30Days" | "return30Days" | "postReflection" | "status" | "voidedReason" | "voidedAt" | "parentId" | "createdAt"
 >;

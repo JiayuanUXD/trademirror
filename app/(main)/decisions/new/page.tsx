@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { DecisionForm } from "@/components/decisions/decision-form";
 import { ChevronLeft, Clock, BookOpen } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getReviewByWeekStart } from "@/lib/db/queries/reviews";
 import { getWeekStart, getWeekEnd, formatWeekLabel } from "@/lib/week";
@@ -23,7 +25,7 @@ export default async function NewDecisionPage({
 }) {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) return null;
+  if (!userId) redirect("/login");
 
   const params = await searchParams;
   const isBackfill = params.mode === "backfill";
@@ -171,7 +173,9 @@ export default async function NewDecisionPage({
           borderColor: "var(--border-subtle)",
         }}
       >
-        <DecisionForm />
+        <Suspense fallback={<div className="h-48 flex items-center justify-center"><div className="text-sm" style={{ color: "var(--muted-foreground)" }}>加载中…</div></div>}>
+          <DecisionForm />
+        </Suspense>
       </div>
     </div>
   );

@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { X, AlertTriangle, ExternalLink } from "lucide-react";
+import { X, AlertTriangle, ExternalLink, Archive, Ban, TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { DecisionTracking } from "./decision-tracking";
 import { ErrorTagger } from "@/components/errors/error-tagger";
-import { ACTION_LABELS, RATIONAL_BASIS, ALIGNMENT_LABELS } from "@/types/decision";
-import type { Decision } from "@/types/decision";
+import { ACTION_LABELS, RATIONAL_BASIS, ALIGNMENT_LABELS, STATUS_LABELS, VOIDED_REASON_LABELS } from "@/types/decision";
+import type { Decision, VoidedReason } from "@/types/decision";
 
 type ErrorLog = {
   id: string;
@@ -33,6 +33,7 @@ type ErrorType = {
 type Props = {
   decisionId: string | null;
   onClose: () => void;
+  onDecisionChange?: () => void;
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -64,23 +65,29 @@ const alignmentColors: Record<string, string> = {
   NOT_ALIGN: "var(--brand-red)",
 };
 
-export function DecisionSheet({ decisionId, onClose }: Props) {
+export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) {
   const [decision, setDecision] = useState<Decision | null>(null);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [errorTypes, setErrorTypes] = useState<ErrorType[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showVoidConfirm, setShowVoidConfirm] = useState(false);
+  const [voidReason, setVoidReason] = useState<VoidedReason>("INPUT_ERROR");
 
   const open = decisionId !== null;
 
-  const fetchData = useCallback(async (id: string) => {
+  const fetchData = useCallback(async (id: string, signal?: AbortSignal) => {
     setLoading(true);
     setDecision(null);
+    setFetchError(false);
     try {
       const [dRes, logsRes, typesRes] = await Promise.all([
-        fetch(`/api/decisions/${id}`),
-        fetch(`/api/decisions/${id}/errors`),
-        fetch(`/api/errors`),
+        fetch(`/api/decisions/${id}`, { signal }),
+        fetch(`/api/decisions/${id}/errors`, { signal }),
+        fetch(`/api/errors`, { signal }),
       ]);
+      if (!dRes.ok || !logsRes.ok || !typesRes.ok) throw new Error("fetch failed");
       const [d, logs, types] = await Promise.all([
         dRes.json() as Promise<Decision>,
         logsRes.json() as Promise<ErrorLog[]>,
@@ -89,13 +96,19 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
       setDecision(d);
       setErrorLogs(logs);
       setErrorTypes(types);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (decisionId) fetchData(decisionId);
+    if (!decisionId) return;
+    const controller = new AbortController();
+    fetchData(decisionId, controller.signal);
+    return () => controller.abort();
   }, [decisionId, fetchData]);
 
   // ESC to close
@@ -112,10 +125,50 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  if (!open) return null;
+  async function handleVoid() {
+    setActionLoading("void");
+    try {
+      const res = await fetch(`/api/decisions/${decisionId}/void`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: voidReason }),
+      });
+      if (res.ok) {
+        const updated = await res.json() as Decision;
+        setDecision(updated);
+        setShowVoidConfirm(false);
+        onDecisionChange?.();
+      }
+    } catch { /* keep */ }
+    finally { setActionLoading(null); }
+  }
+
+  async function handleArchive() {
+    setActionLoading("archive");
+    try {
+      const res = await fetch(`/api/decisions/${decisionId}/archive`, { method: "PATCH" });
+      if (res.ok) {
+        const updated = await res.json() as Decision;
+        setDecision(updated);
+        onDecisionChange?.();
+      }
+    } catch { /* keep */ }
+    finally { setActionLoading(null); }
+  }
 
   const isBuy = decision && (decision.action === "BUY" || decision.action === "ADD");
   const actionColor = isBuy ? "var(--color-up)" : "var(--color-down)";
+  const isActive = decision?.status === "ACTIVE";
+  const isVoided = decision?.status === "VOIDED";
+  const isArchived = decision?.status === "ARCHIVED";
+  const hasParent = !!decision?.parentId;
+
+  const minutesSinceCreated = decision
+    ? Math.floor((Date.now() - decision.createdAt) / 60_000)
+    : Infinity;
+  const canVoidWithoutReason = minutesSinceCreated <= 30;
+
+  if (!open) return null;
 
   return (
     <>
@@ -128,6 +181,9 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
 
       {/* Sheet panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="decision-sheet-title"
         className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
         style={{
           width: "min(580px, 100vw)",
@@ -141,7 +197,7 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
           className="flex items-center justify-between px-5 py-4 shrink-0"
           style={{ borderBottom: "1px solid var(--border-subtle)" }}
         >
-          <span className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+          <span id="decision-sheet-title" className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
             决策详情
           </span>
           <div className="flex items-center gap-2">
@@ -162,6 +218,7 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
             )}
             <button
               onClick={onClose}
+              aria-label="关闭"
               className="flex items-center justify-center w-8 h-8 rounded-lg transition-opacity hover:opacity-70"
               style={{ color: "var(--muted-foreground)", backgroundColor: "var(--surface-overlay)" }}
             >
@@ -178,18 +235,79 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
             </div>
           )}
 
+          {!loading && fetchError && (
+            <div className="flex flex-col items-center justify-center h-48 gap-3">
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>加载失败，请重试</p>
+              <button
+                type="button"
+                onClick={() => decisionId && fetchData(decisionId)}
+                className="px-4 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: "var(--surface-overlay)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                重试
+              </button>
+            </div>
+          )}
+
           {!loading && decision && (
             <div className="px-5 py-5 space-y-5">
+              {/* Status banners */}
+              {isVoided && (
+                <div
+                  className="flex items-start gap-2 px-4 py-3 rounded-lg border"
+                  style={{ backgroundColor: "rgba(148,163,184,0.07)", borderColor: "rgba(148,163,184,0.3)" }}
+                >
+                  <Ban size={15} className="shrink-0 mt-0.5" style={{ color: "var(--muted-foreground)" }} />
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--muted-foreground)" }}>
+                      此决策已作废
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                      {decision.voidedReason && VOIDED_REASON_LABELS[decision.voidedReason]}
+                      {decision.voidedAt && ` · ${dayjs(decision.voidedAt).format("MM/DD HH:mm")}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {isArchived && (
+                <div
+                  className="flex items-start gap-2 px-4 py-3 rounded-lg border"
+                  style={{ backgroundColor: "rgba(148,163,184,0.07)", borderColor: "rgba(148,163,184,0.3)" }}
+                >
+                  <Archive size={15} className="shrink-0 mt-0.5" style={{ color: "var(--muted-foreground)" }} />
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--muted-foreground)" }}>
+                      此决策已归档
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Header */}
               <div className="flex items-start gap-3">
                 <span
                   className="text-[11px] font-bold px-2 py-0.5 rounded shrink-0 mt-0.5"
-                  style={{ backgroundColor: `${actionColor}22`, color: actionColor }}
+                  style={{
+                    backgroundColor: `${actionColor}22`,
+                    color: actionColor,
+                    opacity: isVoided ? 0.5 : 1,
+                  }}
                 >
                   {ACTION_LABELS[decision.action]}
                 </span>
                 <div>
-                  <h2 className="text-lg font-bold" style={{ color: "var(--foreground)" }}>
+                  <h2
+                    className="text-lg font-bold"
+                    style={{
+                      color: "var(--foreground)",
+                      textDecoration: isVoided ? "line-through" : "none",
+                      opacity: isVoided ? 0.5 : 1,
+                    }}
+                  >
                     {decision.stockName}
                     <span className="text-sm font-normal ml-2" style={{ color: "var(--muted-foreground)" }}>
                       {decision.stockCode}
@@ -198,6 +316,11 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
                   <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
                     {dayjs(decision.createdAt).format("YYYY年MM月DD日 HH:mm")}
                   </p>
+                  {hasParent && (
+                    <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                      关联父卡：{decision.parentId?.slice(0, 8)}…
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -311,10 +434,150 @@ export function DecisionSheet({ decisionId, onClose }: Props) {
                   allErrorTypes={errorTypes}
                 />
               </div>
+
+              {/* Action buttons (ACTIVE only) */}
+              {isActive && (
+                <div
+                  className="rounded-xl border p-4 space-y-3"
+                  style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)" }}
+                >
+                  <h3 className="text-xs font-medium uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                    操作
+                  </h3>
+
+                  {showVoidConfirm ? (
+                    <div className="space-y-3">
+                      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                        {canVoidWithoutReason
+                          ? "确认作废此决策？作废后不计入统计。"
+                          : "此决策已超过 30 分钟，请选择作废原因："}
+                      </p>
+                      {!canVoidWithoutReason && (
+                        <div className="flex flex-wrap gap-2">
+                          {(Object.keys(VOIDED_REASON_LABELS) as VoidedReason[]).map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => setVoidReason(r)}
+                              className="text-xs px-3 py-1.5 rounded-full transition-colors"
+                              style={{
+                                backgroundColor: voidReason === r ? "rgba(148,163,184,0.15)" : "var(--surface-overlay)",
+                                color: voidReason === r ? "var(--foreground)" : "var(--muted-foreground)",
+                                border: `1px solid ${voidReason === r ? "var(--border-strong)" : "var(--border-subtle)"}`,
+                              }}
+                            >
+                              {VOIDED_REASON_LABELS[r]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowVoidConfirm(false)}
+                          className="flex-1 h-9 rounded-lg text-xs font-medium transition-colors"
+                          style={{
+                            backgroundColor: "var(--surface-overlay)",
+                            color: "var(--foreground)",
+                            border: "1px solid var(--border-subtle)",
+                          }}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleVoid}
+                          disabled={actionLoading === "void"}
+                          className="flex-1 h-9 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: "var(--brand-red)" }}
+                        >
+                          {actionLoading === "void" ? "处理中…" : "确认作废"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {isBuy && (
+                        <>
+                          <OperationLink
+                            decision={decision}
+                            action="ADD"
+                            label="加仓"
+                            icon={<TrendingUp size={13} />}
+                            color="var(--color-up)"
+                          />
+                          <OperationLink
+                            decision={decision}
+                            action="REDUCE"
+                            label="减仓"
+                            icon={<TrendingDown size={13} />}
+                            color="var(--color-down)"
+                          />
+                          <OperationLink
+                            decision={decision}
+                            action="CLEAR"
+                            label="清仓"
+                            icon={<TrendingDown size={13} />}
+                            color="var(--color-down)"
+                          />
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowVoidConfirm(true)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+                        style={{
+                          color: "var(--muted-foreground)",
+                          backgroundColor: "var(--surface-overlay)",
+                          border: "1px solid var(--border-subtle)",
+                        }}
+                      >
+                        <Ban size={13} />
+                        作废
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleArchive}
+                        disabled={actionLoading === "archive"}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-50"
+                        style={{
+                          color: "var(--muted-foreground)",
+                          backgroundColor: "var(--surface-overlay)",
+                          border: "1px solid var(--border-subtle)",
+                        }}
+                      >
+                        <Archive size={13} />
+                        {actionLoading === "archive" ? "处理中…" : "归档"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+function OperationLink({
+  decision, action, label, icon, color,
+}: {
+  decision: Decision;
+  action: "ADD" | "REDUCE" | "CLEAR";
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <Link
+      href={`/decisions/new?parentId=${decision.id}&stockCode=${decision.stockCode}&stockName=${encodeURIComponent(decision.stockName)}&stockMarket=${decision.stockMarket}&action=${action}`}
+      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+      style={{ backgroundColor: `${color}18`, color, border: `1px solid ${color}33` }}
+    >
+      {icon}
+      {label}
+    </Link>
   );
 }

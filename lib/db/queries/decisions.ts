@@ -1,22 +1,35 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../index";
 import { decisions } from "../schema";
-import type { Decision, DangerSignal, DecisionBasis } from "@/types/decision";
+import type { Decision, DangerSignal, DecisionBasis, VoidedReason } from "@/types/decision";
 
 function rowToDecision(row: typeof decisions.$inferSelect): Decision {
   return {
     ...row,
     basis: JSON.parse(row.basis) as DecisionBasis[],
     dangerSignals: JSON.parse(row.dangerSignals) as DangerSignal[],
-    isArchived: Boolean(row.isArchived),
+    status: row.status as "ACTIVE" | "VOIDED" | "ARCHIVED",
+    voidedReason: (row.voidedReason ?? null) as VoidedReason | null,
+    voidedAt: row.voidedAt ?? null,
+    parentId: row.parentId ?? null,
   };
 }
 
-export async function getDecisions(userId: string, limit = 50): Promise<Decision[]> {
+export async function getDecisions(
+  userId: string,
+  opts?: { status?: "ACTIVE" | "VOIDED" | "ARCHIVED" | "ALL"; limit?: number }
+): Promise<Decision[]> {
+  const limit = opts?.limit ?? 50;
+  const conditions = [eq(decisions.userId, userId)];
+
+  if (opts?.status && opts.status !== "ALL") {
+    conditions.push(eq(decisions.status, opts.status));
+  }
+
   const rows = await db
     .select()
     .from(decisions)
-    .where(and(eq(decisions.isArchived, false), eq(decisions.userId, userId)))
+    .where(and(...conditions))
     .orderBy(desc(decisions.createdAt))
     .limit(limit);
   return rows.map(rowToDecision);
@@ -74,4 +87,41 @@ export async function createDecision(input: InsertDecision, userId: string): Pro
   const created = await getDecisionById(input.id, userId);
   if (!created) throw new Error("Failed to create decision");
   return created;
+}
+
+export async function voidDecision(
+  id: string,
+  userId: string,
+  reason: VoidedReason,
+  now: number = Date.now()
+): Promise<Decision> {
+  await db
+    .update(decisions)
+    .set({ status: "VOIDED", voidedReason: reason, voidedAt: now })
+    .where(
+      and(
+        eq(decisions.id, id),
+        eq(decisions.userId, userId),
+        eq(decisions.status, "ACTIVE")
+      )
+    );
+  const updated = await getDecisionById(id, userId);
+  if (!updated) throw new Error("Decision not found after void");
+  return updated;
+}
+
+export async function archiveDecision(id: string, userId: string): Promise<Decision> {
+  await db
+    .update(decisions)
+    .set({ status: "ARCHIVED" })
+    .where(
+      and(
+        eq(decisions.id, id),
+        eq(decisions.userId, userId),
+        eq(decisions.status, "ACTIVE")
+      )
+    );
+  const updated = await getDecisionById(id, userId);
+  if (!updated) throw new Error("Decision not found after archive");
+  return updated;
 }

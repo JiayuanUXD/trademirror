@@ -167,7 +167,13 @@ export const decisions = sqliteTable("decisions", {
   return30Days: real("return_30_days"),
   dangerSignals: text("danger_signals").notNull(),
   postReflection: text("post_reflection"),
-  isArchived: integer("is_archived", { mode: "boolean" }).default(false).notNull(),
+  status: text("status")
+    .$type<"ACTIVE" | "VOIDED" | "ARCHIVED">()
+    .notNull()
+    .default("ACTIVE"),
+  voidedReason: text("voided_reason").$type<"INPUT_ERROR" | "DUPLICATE" | "NOT_MINE">(),
+  voidedAt: integer("voided_at"),
+  parentId: text("parent_id"),
   createdAt: integer("created_at").notNull(),
   userId: text("user_id").notNull(),
 });

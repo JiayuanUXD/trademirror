@@ -31,7 +31,7 @@ export async function getFomoStats(userId: string): Promise<FomoStats> {
       and(
         gte(decisions.fomoScore, 7),
         isNotNull(decisions.return30Days),
-        eq(decisions.isArchived, false),
+        eq(decisions.status, "ACTIVE"),
         eq(decisions.userId, userId),
       )
     );
@@ -50,7 +50,7 @@ export async function getCalmStats(userId: string): Promise<CalmStats> {
       and(
         lte(decisions.calmScore, 4),
         isNotNull(decisions.return30Days),
-        eq(decisions.isArchived, false),
+        eq(decisions.status, "ACTIVE"),
         eq(decisions.userId, userId),
       )
     );
@@ -73,7 +73,7 @@ export async function getNotAlignThisMonth(userId: string): Promise<NotAlignStat
         eq(decisions.systemAlignment, "NOT_ALIGN"),
         gte(decisions.createdAt, monthStart),
         lte(decisions.createdAt, monthEnd),
-        eq(decisions.isArchived, false),
+        eq(decisions.status, "ACTIVE"),
         eq(decisions.userId, userId),
       )
     );
@@ -96,7 +96,7 @@ export async function getMostRecentDecision(
     .from(decisions)
     .where(
       and(
-        eq(decisions.isArchived, false),
+        eq(decisions.status, "ACTIVE"),
         eq(decisions.userId, userId),
         lt(decisions.createdAt, beforeTs),
       )

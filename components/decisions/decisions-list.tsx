@@ -34,6 +34,7 @@ type Props = { decisions: Decision[] };
 export function DecisionsList({ decisions }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openForComplete, setOpenForComplete] = useState(false);
   const [statusFilter, setStatusFilter] = useState<DecisionStatus | "ALL">("ALL");
   const [showImportModal, setShowImportModal] = useState(false);
   // Tracks which row's "更多" dropdown is open
@@ -131,6 +132,7 @@ export function DecisionsList({ decisions }: Props) {
             {filtered.map((d) => (
               <DecisionCard key={d.id} d={d}
                 onSelect={setSelectedId}
+                onComplete={(id) => { setSelectedId(id); setOpenForComplete(true); }}
                 onActionDone={handleActionDone}
               />
             ))}
@@ -159,6 +161,7 @@ export function DecisionsList({ decisions }: Props) {
                     d={d}
                     isLast={i === filtered.length - 1}
                     onSelect={setSelectedId}
+                    onComplete={(id) => { setSelectedId(id); setOpenForComplete(true); }}
                     onActionDone={handleActionDone}
                     moreOpen={openMoreId === d.id}
                     onMoreToggle={(open) => setOpenMoreId(open ? d.id : null)}
@@ -172,8 +175,9 @@ export function DecisionsList({ decisions }: Props) {
 
       <DecisionSheet
         decisionId={selectedId}
-        onClose={() => setSelectedId(null)}
+        onClose={() => { setSelectedId(null); setOpenForComplete(false); }}
         onDecisionChange={() => router.refresh()}
+        autoExpandComplete={openForComplete}
       />
       {showImportModal && (
         <ImportVisionModal onClose={() => { setShowImportModal(false); router.refresh(); }} />
@@ -207,7 +211,12 @@ function ScoreChip({ value, invert = false, label }: { value: number; invert?: b
 
 // ── Operations: void / archive inline actions ────────────────────────────────
 
-type ActionCallbacks = { onSelect: (id: string) => void; onActionDone: () => void };
+type ActionCallbacks = {
+  onSelect: (id: string) => void;
+  /** Called when opening via the "补全" button — sheet should auto-expand the form. */
+  onComplete?: (id: string) => void;
+  onActionDone: () => void;
+};
 
 async function doArchive(id: string): Promise<boolean> {
   const res = await fetch(`/api/decisions/${id}/archive`, { method: "PATCH" });
@@ -359,6 +368,7 @@ function OperationsCell({
   moreOpen,
   onMoreToggle,
   onSelect,
+  onComplete,
   onActionDone,
 }: { d: Decision; moreOpen: boolean; onMoreToggle: (open: boolean) => void } & ActionCallbacks) {
   const isActive = d.status === "ACTIVE";
@@ -383,7 +393,7 @@ function OperationsCell({
         {/* Primary: 补全 */}
         {isIncomplete && (
           <button type="button"
-            onClick={() => onSelect(d.id)}
+            onClick={() => (onComplete ?? onSelect)(d.id)}
             className={btnBase}
             style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "var(--brand-warning)", border: "1px solid rgba(245,158,11,0.3)" }}>
             <PenLine size={11} /> 补全
@@ -437,7 +447,7 @@ type RowProps = {
   onMoreToggle: (open: boolean) => void;
 } & ActionCallbacks;
 
-function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onActionDone }: RowProps) {
+function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onComplete, onActionDone }: RowProps) {
   const isVoided   = d.status === "VOIDED";
   const isArchived = d.status === "ARCHIVED";
   const isIncomplete = d.incomplete && d.status === "ACTIVE";
@@ -548,6 +558,7 @@ function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onActionDone
         moreOpen={moreOpen}
         onMoreToggle={onMoreToggle}
         onSelect={onSelect}
+        onComplete={onComplete}
         onActionDone={onActionDone}
       />
     </tr>
@@ -556,7 +567,7 @@ function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onActionDone
 
 // ── Mobile card ─────────────────────────────────────────────────────────────
 
-function DecisionCard({ d, onSelect, onActionDone }: { d: Decision } & ActionCallbacks) {
+function DecisionCard({ d, onSelect, onComplete, onActionDone }: { d: Decision } & ActionCallbacks) {
   const [moreOpen, setMoreOpen] = useState(false);
   const color = ACTION_COLORS[d.action];
   const hasDanger = d.dangerSignals.length > 0;
@@ -642,7 +653,7 @@ function DecisionCard({ d, onSelect, onActionDone }: { d: Decision } & ActionCal
           style={{ borderTop: "1px solid var(--border-subtle)", backgroundColor: "var(--surface-overlay)" }}
           onClick={stop}>
           {isIncomplete && (
-            <button type="button" onClick={() => onSelect(d.id)} className={btnBase}
+            <button type="button" onClick={() => (onComplete ?? onSelect)(d.id)} className={btnBase}
               style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "var(--brand-warning)", border: "1px solid rgba(245,158,11,0.3)" }}>
               <PenLine size={11} /> 补全
             </button>

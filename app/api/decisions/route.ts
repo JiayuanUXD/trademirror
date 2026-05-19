@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { createDecisionSchema } from "@/lib/validators/decision";
-import { createDecision, getDecisions } from "@/lib/db/queries/decisions";
-import { syncHoldingFromDecision } from "@/lib/db/queries/holdings";
+import { createDecision, getDecisions, getDecisionsByStockCode } from "@/lib/db/queries/decisions";
 import { calcDangerSignals } from "@/lib/danger-signals";
 import type { DecisionStatus } from "@/types/decision";
 
@@ -16,6 +15,13 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
+    // Shortcut: return all decisions for a specific stock code
+    const stockCodeParam = req.nextUrl.searchParams.get("stockCode");
+    if (stockCodeParam) {
+      const list = await getDecisionsByStockCode(stockCodeParam, userId);
+      return NextResponse.json(list);
+    }
+
     const statusParam = req.nextUrl.searchParams.get("status") as string | null;
     const validStatuses = ["ACTIVE", "VOIDED", "ARCHIVED", "ALL"] as const;
     const status = statusParam && validStatuses.includes(statusParam as typeof validStatuses[number])
@@ -80,12 +86,6 @@ export async function POST(req: NextRequest) {
       parentId: (rawBody.parentId as string) ?? null,
       createdAt: data.tradedAt || Date.now(),
     }, userId);
-
-    // 同步持仓档案（fire-and-forget，失败不影响决策卡创建）
-    syncHoldingFromDecision(
-      { stockCode: decision.stockCode, action: decision.action, price: decision.price, quantity: decision.quantity },
-      userId
-    ).catch((e) => console.error("[syncHolding]", e));
 
     return NextResponse.json(decision, { status: 201 });
   } catch (err) {

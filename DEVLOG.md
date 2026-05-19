@@ -145,6 +145,71 @@
 **Fix #10 — LRU 缓存命中时正确更新顺序**
 - `components/shared/stock-combobox.tsx`：缓存命中时先 `delete` 再 `set`，确保 Map 按 LRU 排序，不再退化为 FIFO
 
+### 持仓库全面重构
+
+**持仓页布局升级**
+- 新建 `components/holdings/holdings-list.tsx`：
+  - 桌面端表格（`hidden sm:block`）：股票 / 板块 / 成本×股数 / 持仓市值 / 健康度 / 状态，点击行打开抽屉
+  - 移动端卡片（`sm:hidden`）：带左侧状态色条，展示仓位、健康度进度条
+  - 状态筛选条（全部 / 持有 / 观察 / 已清仓），各项显示数量
+  - 无止损警告 Banner（持仓中未设撤退条件的数量）
+  - "新建档案"按钮从 Server Component 下移到 Client Component，触发抽屉而非页面跳转
+- `app/(main)/holdings/page.tsx` 简化为纯数据壳，只负责 DB 查询 + 传 props
+
+**板块/概念自动标注**
+- 新建 `lib/sector-inference.ts`：
+  - `CODE_MAP`：50+ 主要个股精确代码映射（茅台/五粮液/宁德/比亚迪等）
+  - `NAME_RULES`：25 条正则规则覆盖白酒 / 银行 / 医药 / 新能源 / 半导体等主要板块
+  - `inferSector(stockCode, stockName)` 优先精确匹配，其次关键词，空字符串表示未知
+- 表格和卡片中 `h.sector` 为空时自动调用 `inferSector()` 展示推断标签，无需手动维护
+
+**持仓建档和详情抽屉化**
+- 新建 `components/holdings/holding-sheet.tsx`：
+  - 两种模式：`{ type: "new" }` 展示建档表单，`{ type: "detail", holding }` 展示持仓头部 + Tabs
+  - 详情模式：头部显示股票名/代码/板块/状态/仓位/盈亏/健康度进度条，懒加载对应决策卡
+  - 创建成功后抽屉内直接切换到详情模式（无页面跳转）
+  - ESC / 点背景关闭；右上角"↗"链接保留直接访问完整页面能力
+  - 关闭时 `router.refresh()` 同步列表数据
+- `components/holdings/holding-form.tsx` 新增可选 `onSuccess(holding)` 回调，有回调时不跳转
+- `app/api/decisions/route.ts` 新增 `?stockCode=xxx` 参数，供抽屉懒加载操作记录
+- Inferred holding "建立档案"点击后，claim API 返回完整 holding，抽屉直接进入详情模式
+
+**撤退条件标签化**
+- 废弃三段式表单（类型下拉 + 描述文本 + 阈值输入）
+- 新建三组预设标签：
+  - **回撤止损**：-3% / -5% / -8% / -10% / -15% / -20%（自动填充 threshold）
+  - **均线**：5日线 / 10日线 / 20日线 / 60日线 / 前低
+  - **基本面**：业绩下滑 / 增速不达预期 / 逻辑失效 / 估值泡沫
+- 点击即添加，已添加的标签绿色 ✓ 禁用，防止重复
+- 保留底部自由文本输入（回车添加，类型默认 CUSTOM）
+
+### 感知性能优化
+
+**路由级加载骨架屏**
+- 新建 `app/(main)/loading.tsx`：Next.js route-level loading UI，用户点击导航后立即渲染灰色占位骨架（Header 骨架 + 筛选条 + 4 张卡片），消除原先页面间切换时的白屏等待
+- `globals.css` 新增 `.skeleton` 类（`skeleton-pulse` 呼吸动画，1.6s ease-in-out）
+
+**顶部导航进度条**
+- 新建 `components/shared/navigation-progress.tsx`：
+  - 通过 `document` 点击事件捕获链接点击，立即开始进度动画
+  - 以 `usePathname` 变化为完成信号，进度条推进到 100% 后淡出
+  - 使用 `isMounted` ref 跳过初次挂载，避免首屏触发
+  - 2px 蓝色高光条 + `box-shadow` 光晕效果
+
+**页面入场动画**
+- 新建 `components/shared/page-transition.tsx`：`key={pathname}` 强制 div 在每次路由切换时重新挂载，触发 CSS 入场动画
+- `globals.css` 新增 `.page-enter`（`pageEnter` keyframe，0.18s 淡入 + 5px 上移）
+- `app/(main)/layout.tsx` 引入 `NavigationProgress` + `PageTransition`，包裹 `{children}`
+
+### 持仓 Tab 乐观更新
+
+- `components/holdings/holding-detail-tabs.tsx` 全面重构为乐观更新模式：
+  - 移除 `useTransition` / `isPending` 及 `opacity-70 pointer-events-none` 包装层
+  - 新增 `mutate(next)` 函数：`setHolding(next)` 立即更新 UI → 后台 `PATCH` → 失败时静默 `setHolding(prev)` 回滚
+  - 覆盖 12 个操作：`addReason` / `removeReason` / `toggleReasonFlag` / `addPrereq` / `togglePrereq` / `removePrereq` / `addPreset` / `addCustomExit` / `triggerExitCondition` / `removeExit`
+  - 所有函数从 `async` 改为同步，输入框立即清空（不等服务器响应）
+  - ID 已由客户端 `crypto.randomUUID()` 生成，新增条目同样可乐观插入
+
 ---
 
 ## 2026-05-15

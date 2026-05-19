@@ -1,9 +1,47 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Plus, Trash2, CheckSquare, Square, AlertTriangle } from "lucide-react";
+import { useState, useRef } from "react";
+import { Plus, Trash2, CheckSquare, Square, AlertTriangle, Check } from "lucide-react";
 import type { Holding, LogicReason, Prerequisite, ExitCondition, ExitConditionType } from "@/types/holding";
 import { EXIT_CONDITION_LABELS } from "@/types/holding";
+
+// ─── Exit condition presets ───────────────────────────────────────────────────
+
+type Preset = { type: ExitConditionType; label: string; description: string; threshold?: number };
+type PresetGroup = { label: string; presets: Preset[] };
+
+const PRESET_GROUPS: PresetGroup[] = [
+  {
+    label: "回撤止损",
+    presets: [
+      { type: "TRAILING_STOP", label: "-3%",  description: "从最高点回撤 3% 止损",  threshold: 3  },
+      { type: "TRAILING_STOP", label: "-5%",  description: "从最高点回撤 5% 止损",  threshold: 5  },
+      { type: "TRAILING_STOP", label: "-8%",  description: "从最高点回撤 8% 止损",  threshold: 8  },
+      { type: "TRAILING_STOP", label: "-10%", description: "从最高点回撤 10% 止损", threshold: 10 },
+      { type: "TRAILING_STOP", label: "-15%", description: "从最高点回撤 15% 止损", threshold: 15 },
+      { type: "TRAILING_STOP", label: "-20%", description: "从最高点回撤 20% 止损", threshold: 20 },
+    ],
+  },
+  {
+    label: "均线",
+    presets: [
+      { type: "TECH_BREAK", label: "5日线",  description: "跌破 5 日均线" },
+      { type: "TECH_BREAK", label: "10日线", description: "跌破 10 日均线" },
+      { type: "TECH_BREAK", label: "20日线", description: "跌破 20 日均线" },
+      { type: "TECH_BREAK", label: "60日线", description: "跌破 60 日均线" },
+      { type: "TECH_BREAK", label: "前低",   description: "跌破前期低点" },
+    ],
+  },
+  {
+    label: "基本面",
+    presets: [
+      { type: "EARNINGS_BELOW", label: "业绩下滑",   description: "连续两季度营收/利润同比下滑" },
+      { type: "EARNINGS_BELOW", label: "增速不达预期", description: "业绩增速低于预期目标" },
+      { type: "CUSTOM",         label: "逻辑失效",   description: "持有逻辑出现根本性变化" },
+      { type: "CUSTOM",         label: "估值泡沫",   description: "估值严重高估，超历史均值两倍以上" },
+    ],
+  },
+];
 import type { Decision } from "@/types/decision";
 import { ACTION_LABELS } from "@/types/decision";
 import dayjs from "dayjs";
@@ -16,99 +54,108 @@ type Tab = (typeof TABS)[number];
 export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("持有逻辑");
   const [holding, setHolding] = useState(initial);
-  const [isPending, startTransition] = useTransition();
+  // Track in-flight request count for a subtle sync indicator (optional future use)
+  const syncCount = useRef(0);
 
-  async function patch(body: Record<string, unknown>) {
-    const res = await fetch(`/api/holdings/${holding.id}`, {
+  /**
+   * Optimistic mutate: update UI instantly, sync to server in background.
+   * On server error, silently rolls back to the previous state.
+   */
+  function mutate(next: Holding) {
+    const prev = holding;
+    setHolding(next);
+    syncCount.current += 1;
+
+    fetch(`/api/holdings/${next.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const updated = await res.json() as Holding;
-      startTransition(() => setHolding(updated));
-    }
+      body: JSON.stringify({
+        reasons:        next.logic.reasons,
+        moat:           next.logic.moat,
+        keyFinancials:  next.logic.keyFinancials,
+        prerequisites:  next.prerequisites,
+        exitConditions: next.exitConditions,
+      }),
+    })
+      .then((r) => { if (!r.ok) setHolding(prev); })
+      .catch(() => setHolding(prev))
+      .finally(() => { syncCount.current -= 1; });
   }
 
   // ── Logic Tab ──
   const [newReason, setNewReason] = useState("");
 
-  async function addReason() {
+  function addReason() {
     if (!newReason.trim()) return;
-    const reasons: LogicReason[] = [
-      ...holding.logic.reasons,
-      { id: crypto.randomUUID(), content: newReason.trim(), hasData: false, isVerifiable: false },
-    ];
-    await patch({ reasons, moat: holding.logic.moat, keyFinancials: holding.logic.keyFinancials });
+    mutate({
+      ...holding,
+      logic: {
+        ...holding.logic,
+        reasons: [...holding.logic.reasons, { id: crypto.randomUUID(), content: newReason.trim(), hasData: false, isVerifiable: false }],
+      },
+    });
     setNewReason("");
   }
 
-  async function removeReason(id: string) {
-    const reasons = holding.logic.reasons.filter((r) => r.id !== id);
-    await patch({ reasons, moat: holding.logic.moat, keyFinancials: holding.logic.keyFinancials });
+  function removeReason(id: string) {
+    mutate({ ...holding, logic: { ...holding.logic, reasons: holding.logic.reasons.filter((r) => r.id !== id) } });
   }
 
-  async function toggleReasonFlag(id: string, flag: "hasData" | "isVerifiable") {
-    const reasons = holding.logic.reasons.map((r) =>
-      r.id === id ? { ...r, [flag]: !r[flag] } : r
-    );
-    await patch({ reasons, moat: holding.logic.moat, keyFinancials: holding.logic.keyFinancials });
+  function toggleReasonFlag(id: string, flag: "hasData" | "isVerifiable") {
+    mutate({
+      ...holding,
+      logic: {
+        ...holding.logic,
+        reasons: holding.logic.reasons.map((r) => r.id === id ? { ...r, [flag]: !r[flag] } : r),
+      },
+    });
   }
 
   // ── Prerequisites Tab ──
   const [newPrereq, setNewPrereq] = useState("");
 
-  async function addPrereq() {
+  function addPrereq() {
     if (!newPrereq.trim()) return;
-    const prerequisites: Prerequisite[] = [
-      ...holding.prerequisites,
-      { id: crypto.randomUUID(), content: newPrereq.trim(), checked: false },
-    ];
-    await patch({ prerequisites });
+    mutate({ ...holding, prerequisites: [...holding.prerequisites, { id: crypto.randomUUID(), content: newPrereq.trim(), checked: false }] });
     setNewPrereq("");
   }
 
-  async function togglePrereq(id: string) {
-    const prerequisites = holding.prerequisites.map((p) =>
-      p.id === id ? { ...p, checked: !p.checked } : p
-    );
-    await patch({ prerequisites });
+  function togglePrereq(id: string) {
+    mutate({ ...holding, prerequisites: holding.prerequisites.map((p) => p.id === id ? { ...p, checked: !p.checked } : p) });
   }
 
-  async function removePrereq(id: string) {
-    const prerequisites = holding.prerequisites.filter((p) => p.id !== id);
-    await patch({ prerequisites });
+  function removePrereq(id: string) {
+    mutate({ ...holding, prerequisites: holding.prerequisites.filter((p) => p.id !== id) });
   }
 
   // ── Exit Conditions Tab ──
-  const [newExit, setNewExit] = useState({ type: "PRICE_BELOW" as ExitConditionType, description: "", threshold: "" });
+  const [customExitDesc, setCustomExitDesc] = useState("");
 
-  async function addExitCondition() {
-    if (!newExit.description.trim()) return;
-    const exitConditions: ExitCondition[] = [
-      ...holding.exitConditions,
-      {
+  function addPreset(preset: Preset) {
+    mutate({
+      ...holding,
+      exitConditions: [...holding.exitConditions, {
         id: crypto.randomUUID(),
-        type: newExit.type,
-        description: newExit.description.trim(),
-        threshold: newExit.threshold ? Number(newExit.threshold) : undefined,
+        type: preset.type,
+        description: preset.description,
+        ...(preset.threshold !== undefined && { threshold: preset.threshold }),
         triggered: false,
-      },
-    ];
-    await patch({ exitConditions });
-    setNewExit({ type: "PRICE_BELOW", description: "", threshold: "" });
+      }],
+    });
   }
 
-  async function triggerExitCondition(id: string) {
-    const exitConditions = holding.exitConditions.map((c) =>
-      c.id === id ? { ...c, triggered: !c.triggered } : c
-    );
-    await patch({ exitConditions });
+  function addCustomExit() {
+    if (!customExitDesc.trim()) return;
+    mutate({ ...holding, exitConditions: [...holding.exitConditions, { id: crypto.randomUUID(), type: "CUSTOM", description: customExitDesc.trim(), triggered: false }] });
+    setCustomExitDesc("");
   }
 
-  async function removeExit(id: string) {
-    const exitConditions = holding.exitConditions.filter((c) => c.id !== id);
-    await patch({ exitConditions });
+  function triggerExitCondition(id: string) {
+    mutate({ ...holding, exitConditions: holding.exitConditions.map((c) => c.id === id ? { ...c, triggered: !c.triggered } : c) });
+  }
+
+  function removeExit(id: string) {
+    mutate({ ...holding, exitConditions: holding.exitConditions.filter((c) => c.id !== id) });
   }
 
   const cardStyle = {
@@ -123,7 +170,7 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
   };
 
   return (
-    <div className={isPending ? "opacity-70 pointer-events-none" : ""}>
+    <div>
       {/* Tab bar */}
       <div className="flex gap-1 mb-4 border-b" style={{ borderColor: "var(--border-subtle)" }}>
         {TABS.map((tab) => (
@@ -323,47 +370,59 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
             </div>
           ))}
 
-          {/* Add exit condition */}
-          <div
-            className="rounded-lg border p-3 space-y-2"
-            style={cardStyle}
-          >
-            <p className="text-xs font-medium" style={{ color: "var(--foreground)" }}>添加撤退条件</p>
-            <select
-              className="w-full h-9 px-3 rounded-md text-sm border"
-              style={inputStyle}
-              value={newExit.type}
-              onChange={(e) => setNewExit((p) => ({ ...p, type: e.target.value as ExitConditionType }))}
-            >
-              {(Object.keys(EXIT_CONDITION_LABELS) as ExitConditionType[]).map((t) => (
-                <option key={t} value={t} style={{ backgroundColor: "var(--surface-card)" }}>
-                  {EXIT_CONDITION_LABELS[t]}
-                </option>
-              ))}
-            </select>
-            <input
-              className="w-full h-9 px-3 rounded-md text-sm border"
-              style={inputStyle}
-              placeholder="描述条件，如：跌破 105 元止损…"
-              value={newExit.description}
-              onChange={(e) => setNewExit((p) => ({ ...p, description: e.target.value }))}
-            />
-            <div className="flex gap-2">
+          {/* Quick presets + custom input */}
+          <div className="rounded-lg border p-3 space-y-3" style={cardStyle}>
+            <p className="text-xs font-medium" style={{ color: "var(--foreground)" }}>快速添加</p>
+
+            {PRESET_GROUPS.map((group) => (
+              <div key={group.label} className="space-y-1.5">
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+                  {group.label}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.presets.map((preset) => {
+                    const added = holding.exitConditions.some((c) => c.description === preset.description);
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        disabled={added}
+                        onClick={() => addPreset(preset)}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-all"
+                        style={{
+                          borderColor: added ? "transparent" : "var(--border-subtle)",
+                          backgroundColor: added ? "rgba(34,197,94,0.1)" : "var(--surface-card)",
+                          color: added ? "var(--brand-green)" : "var(--muted-foreground)",
+                          cursor: added ? "default" : "pointer",
+                        }}
+                      >
+                        {added && <Check size={10} />}
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            {/* Custom free-text */}
+            <div className="pt-1 flex gap-2" style={{ borderTop: "1px solid var(--border-subtle)" }}>
               <input
-                type="number"
-                className="flex-1 h-9 px-3 rounded-md text-sm border"
+                className="flex-1 h-8 px-3 rounded-md text-xs border"
                 style={inputStyle}
-                placeholder="阈值（选填）"
-                value={newExit.threshold}
-                onChange={(e) => setNewExit((p) => ({ ...p, threshold: e.target.value }))}
+                placeholder="自定义条件，回车添加…"
+                value={customExitDesc}
+                onChange={(e) => setCustomExitDesc(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addCustomExit()}
               />
               <button
                 type="button"
-                onClick={addExitCondition}
-                className="h-9 px-4 rounded-md text-sm font-medium text-white"
+                onClick={addCustomExit}
+                disabled={!customExitDesc.trim()}
+                className="h-8 px-3 rounded-md text-white disabled:opacity-40 transition-opacity"
                 style={{ backgroundColor: "var(--brand-blue)" }}
               >
-                添加
+                <Plus size={13} />
               </button>
             </div>
           </div>

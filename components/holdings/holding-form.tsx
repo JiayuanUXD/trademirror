@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createHoldingSchema } from "@/lib/validators/holding";
-import type { HoldingStatus } from "@/types/holding";
+import type { Holding, HoldingStatus } from "@/types/holding";
 import { STATUS_LABELS } from "@/types/holding";
 import { StockCombobox, StockItem } from "@/components/shared/stock-combobox";
 
@@ -13,7 +13,12 @@ const MARKET_OPTIONS = [
   { value: "BJ" as const, label: "北" },
 ];
 
-export function HoldingForm() {
+type Props = {
+  /** Called with the newly created holding instead of navigating away. */
+  onSuccess?: (holding: Holding) => void;
+};
+
+export function HoldingForm({ onSuccess }: Props = {}) {
   const router = useRouter();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,9 +27,7 @@ export function HoldingForm() {
     stockCode: "",
     stockName: "",
     stockMarket: "SH" as "SH" | "SZ" | "BJ",
-    status: "HOLDING" as HoldingStatus,
-    costPrice: "",
-    shares: "",
+    status: "WATCHING" as HoldingStatus,
     sector: "",
     initialReason: "",
   });
@@ -35,11 +38,7 @@ export function HoldingForm() {
   }
 
   async function handleSubmit() {
-    const parsed = createHoldingSchema.safeParse({
-      ...form,
-      costPrice: Number(form.costPrice),
-      shares: Number(form.shares),
-    });
+    const parsed = createHoldingSchema.safeParse(form);
     if (!parsed.success) {
       const errs: Record<string, string> = {};
       for (const issue of parsed.error.issues) {
@@ -61,17 +60,19 @@ export function HoldingForm() {
         const data = await res.json() as { error?: string };
         throw new Error(data.error ?? "提交失败");
       }
-      const holding = await res.json() as { id: string };
-      router.push(`/holdings/${holding.id}`);
-      router.refresh();
+      const holding = await res.json() as Holding;
+      if (onSuccess) {
+        onSuccess(holding);
+      } else {
+        router.push(`/holdings/${holding.id}`);
+        router.refresh();
+      }
     } catch (err) {
       setErrors({ submit: err instanceof Error ? err.message : "提交失败" });
     } finally {
       setIsSubmitting(false);
     }
   }
-
-  const amount = (Number(form.costPrice) || 0) * (Number(form.shares) || 0);
 
   return (
     <div className="space-y-4">
@@ -105,7 +106,10 @@ export function HoldingForm() {
 
       {/* Status */}
       <div className="space-y-1">
-        <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>状态</label>
+        <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          初始状态
+          <span className="ml-1 opacity-60">（持仓数量与成本价将自动从决策卡计算）</span>
+        </label>
         <div className="flex gap-2">
           {(["HOLDING", "WATCHING", "CLOSED"] as HoldingStatus[]).map((s) => {
             const isActive = form.status === s;
@@ -121,38 +125,6 @@ export function HoldingForm() {
           })}
         </div>
       </div>
-
-      {/* Cost + shares */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>成本价（元）</label>
-          <input type="number" min="0" step="0.01"
-            className="w-full h-9 px-3 rounded-md text-sm border"
-            style={{ backgroundColor: "var(--surface-overlay)", borderColor: errors.costPrice ? "var(--brand-red)" : "var(--border-subtle)", color: "var(--foreground)" }}
-            placeholder="1800.00"
-            value={form.costPrice}
-            onChange={(e) => set("costPrice", e.target.value)}
-          />
-          {errors.costPrice && <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.costPrice}</p>}
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>持股数量（股）</label>
-          <input type="number" min="100" step="100"
-            className="w-full h-9 px-3 rounded-md text-sm border"
-            style={{ backgroundColor: "var(--surface-overlay)", borderColor: errors.shares ? "var(--brand-red)" : "var(--border-subtle)", color: "var(--foreground)" }}
-            placeholder="100"
-            value={form.shares}
-            onChange={(e) => set("shares", e.target.value)}
-          />
-          {errors.shares && <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.shares}</p>}
-        </div>
-      </div>
-
-      {amount > 0 && (
-        <div className="text-right text-sm" style={{ color: "var(--muted-foreground)" }}>
-          持仓市值：<span style={{ color: "var(--foreground)", fontWeight: 600 }}>¥{amount.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}</span>
-        </div>
-      )}
 
       {/* Sector */}
       <div className="space-y-1">

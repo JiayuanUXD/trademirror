@@ -34,6 +34,11 @@ type Props = {
   decisionId: string | null;
   onClose: () => void;
   onDecisionChange?: () => void;
+  /** "sheet" (default) = fixed overlay from the right.
+   *  "panel" = inline, fills its container — no backdrop, no body-scroll lock. */
+  variant?: "sheet" | "panel";
+  /** When true, the inline completion form is expanded immediately on open. */
+  autoExpandComplete?: boolean;
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -65,7 +70,7 @@ const alignmentColors: Record<string, string> = {
   NOT_ALIGN: "var(--brand-red)",
 };
 
-export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) {
+export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant = "sheet", autoExpandComplete = false }: Props) {
   const [decision, setDecision] = useState<Decision | null>(null);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [errorTypes, setErrorTypes] = useState<ErrorType[]>([]);
@@ -120,24 +125,27 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
 
   useEffect(() => {
     if (!decisionId) return;
+    // Reset form expansion state for each new decision opened
+    setShowCompleteForm(autoExpandComplete);
     const controller = new AbortController();
     fetchData(decisionId, controller.signal);
     return () => controller.abort();
-  }, [decisionId, fetchData]);
+  }, [decisionId, fetchData, autoExpandComplete]);
 
-  // ESC to close
+  // ESC to close (sheet mode only)
   useEffect(() => {
-    if (!open) return;
+    if (!open || variant !== "sheet") return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
+  }, [open, onClose, variant]);
 
-  // Prevent body scroll when open
+  // Prevent body scroll when open (sheet mode only)
   useEffect(() => {
+    if (variant !== "sheet") return;
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  }, [open, variant]);
 
   async function handleVoid() {
     setActionLoading("void");
@@ -214,65 +222,45 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
 
   if (!open) return null;
 
-  return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40"
-        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
-        onClick={onClose}
-      />
-
-      {/* Sheet panel */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="decision-sheet-title"
-        className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
-        style={{
-          width: "min(580px, 100vw)",
-          backgroundColor: "var(--surface-base)",
-          borderLeft: "1px solid var(--border-subtle)",
-          boxShadow: "-8px 0 32px rgba(0,0,0,0.3)",
-        }}
-      >
-        {/* Sheet header */}
-        <div
-          className="flex items-center justify-between px-5 py-4 shrink-0"
-          style={{ borderBottom: "1px solid var(--border-subtle)" }}
+  /* ── Shared header & scrollable content (used by both modes) ─────── */
+  const sharedHeader = (
+    <div
+      className="flex items-center justify-between px-5 py-4 shrink-0"
+      style={{ borderBottom: "1px solid var(--border-subtle)" }}
+    >
+      <span id="decision-sheet-title" className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+        决策详情
+      </span>
+      <div className="flex items-center gap-2">
+        {decision && (
+          <Link
+            href={`/decisions/${decision.id}`}
+            className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+            style={{
+              color: "var(--muted-foreground)",
+              backgroundColor: "var(--surface-overlay)",
+              border: "1px solid var(--border-subtle)",
+            }}
+            onClick={onClose}
+          >
+            <ExternalLink size={12} />
+            独立页面
+          </Link>
+        )}
+        <button
+          onClick={onClose}
+          aria-label="关闭"
+          className="flex items-center justify-center w-8 h-8 rounded-lg transition-opacity hover:opacity-70"
+          style={{ color: "var(--muted-foreground)", backgroundColor: "var(--surface-overlay)" }}
         >
-          <span id="decision-sheet-title" className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
-            决策详情
-          </span>
-          <div className="flex items-center gap-2">
-            {decision && (
-              <Link
-                href={`/decisions/${decision.id}`}
-                className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-opacity hover:opacity-80"
-                style={{
-                  color: "var(--muted-foreground)",
-                  backgroundColor: "var(--surface-overlay)",
-                  border: "1px solid var(--border-subtle)",
-                }}
-                onClick={onClose}
-              >
-                <ExternalLink size={12} />
-                独立页面
-              </Link>
-            )}
-            <button
-              onClick={onClose}
-              aria-label="关闭"
-              className="flex items-center justify-center w-8 h-8 rounded-lg transition-opacity hover:opacity-70"
-              style={{ color: "var(--muted-foreground)", backgroundColor: "var(--surface-overlay)" }}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
 
-        {/* Sheet content */}
-        <div className="flex-1 overflow-y-auto">
+  const sharedBody = (
+    <div className="flex-1 overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center h-48">
               <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>加载中…</div>
@@ -769,7 +757,46 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
               )}
             </div>
           )}
-        </div>
+    </div>
+  );  /* end sharedBody */
+
+  /* ── Panel mode: inline, no backdrop ─────────────────────────────── */
+  if (variant === "panel") {
+    return (
+      <div
+        role="dialog"
+        aria-labelledby="decision-sheet-title"
+        className="h-full flex flex-col overflow-hidden"
+        style={{ backgroundColor: "var(--surface-base)" }}
+      >
+        {sharedHeader}
+        {sharedBody}
+      </div>
+    );
+  }
+
+  /* ── Sheet mode (default): fixed overlay ─────────────────────────── */
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40"
+        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="decision-sheet-title"
+        className="fixed right-0 top-0 bottom-0 z-50 flex flex-col overflow-hidden"
+        style={{
+          width: "min(580px, 100vw)",
+          backgroundColor: "var(--surface-base)",
+          borderLeft: "1px solid var(--border-subtle)",
+          boxShadow: "-8px 0 32px rgba(0,0,0,0.3)",
+        }}
+      >
+        {sharedHeader}
+        {sharedBody}
       </div>
     </>
   );

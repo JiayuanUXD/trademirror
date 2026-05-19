@@ -8,13 +8,8 @@ export const createHoldingSchema = z.object({
     .regex(/^\d+$/, "只能包含数字"),
   stockName: z.string().min(1, "请输入股票名称").max(10),
   stockMarket: z.enum(["SH", "SZ", "BJ"], { error: "请选择市场" }),
-  status: z.enum(["HOLDING", "WATCHING", "CLOSED"], { error: "请选择状态" }),
-  costPrice: z.number({ error: "请输入成本价" }).positive("成本价必须大于0"),
-  shares: z
-    .number({ error: "请输入持股数量" })
-    .int()
-    .positive()
-    .multipleOf(100, "持股数量为100的整数倍"),
+  /** WATCHING = 观察中（无持仓）; HOLDING/CLOSED are derived from decisions at read time */
+  status: z.enum(["HOLDING", "WATCHING", "CLOSED"], { error: "请选择状态" }).default("WATCHING"),
   sector: z.string().max(20).optional(),
   initialReason: z.string().max(100).optional(),
 });
@@ -47,10 +42,9 @@ export const exitConditionSchema = z.object({
 });
 
 export const patchHoldingSchema = z.object({
+  /** Only WATCHING can be meaningfully set; HOLDING/CLOSED are derived from decisions */
   status: z.enum(["HOLDING", "WATCHING", "CLOSED"]).optional(),
-  currentPrice: z.number().positive().optional(),
-  shares: z.number().int().positive().optional(),
-  costPrice: z.number().positive().optional(),
+  currentPrice: z.number().positive().nullable().optional(),
   sector: z.string().max(20).optional(),
   moat: z.string().max(500).optional(),
   keyFinancials: z.string().optional(),

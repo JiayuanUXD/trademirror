@@ -4,6 +4,7 @@ import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { auth } from "@/auth";
 import { getDecisionById } from "@/lib/db/queries/decisions";
 import { getErrorLogsByDecision, getErrorTypes } from "@/lib/db/queries/errors";
+import { withRetry } from "@/lib/db/retry";
 import { DecisionTracking } from "@/components/decisions/decision-tracking";
 import { ErrorTagger } from "@/components/errors/error-tagger";
 import { ACTION_LABELS, RATIONAL_BASIS, ALIGNMENT_LABELS } from "@/types/decision";
@@ -42,11 +43,13 @@ export default async function DecisionDetailPage({ params }: Props) {
   if (!userId) redirect("/login");
 
   const { id } = await params;
-  const [decision, errorLogs, allErrorTypes] = await Promise.all([
-    getDecisionById(id, userId),
-    getErrorLogsByDecision(id, userId),
-    getErrorTypes(userId),
-  ]);
+  const [decision, errorLogs, allErrorTypes] = await withRetry(() =>
+    Promise.all([
+      getDecisionById(id, userId),
+      getErrorLogsByDecision(id, userId),
+      getErrorTypes(userId),
+    ])
+  );
   if (!decision) notFound();
 
   const isBuy = decision.action === "BUY" || decision.action === "ADD";

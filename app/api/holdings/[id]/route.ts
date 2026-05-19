@@ -43,8 +43,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const holding = await updateHolding(id, userId, {
       ...(data.status && { status: data.status }),
       ...(data.currentPrice !== undefined && { currentPrice: data.currentPrice }),
-      ...(data.shares !== undefined && { shares: data.shares }),
-      ...(data.costPrice !== undefined && { costPrice: data.costPrice }),
       ...(data.sector !== undefined && { sector: data.sector }),
       ...(data.reasons !== undefined || data.moat !== undefined || data.keyFinancials !== undefined
         ? {

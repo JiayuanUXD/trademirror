@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { Sidebar } from "@/components/shared/sidebar";
 import { Navbar } from "@/components/shared/navbar";
+import { NavigationProgress } from "@/components/shared/navigation-progress";
+import { PageTransition } from "@/components/shared/page-transition";
 
 export default async function MainLayout({
   children,
@@ -15,10 +17,13 @@ export default async function MainLayout({
 
   return (
     <div className="h-full flex flex-col">
+      <NavigationProgress />
       <Navbar user={user} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar role={role} />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );

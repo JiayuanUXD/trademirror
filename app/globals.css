@@ -197,3 +197,28 @@
 .nav-item:active {
   transform: scale(0.97);
 }
+
+/* ── Skeleton loading ──────────────────────────────────────────────────── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+.skeleton {
+  background-color: var(--surface-overlay);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Page entry animation ──────────────────────────────────────────────── */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-enter {
+  animation: page-enter 0.18s ease-out both;
+}

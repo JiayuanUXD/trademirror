@@ -39,6 +39,7 @@ const SYSTEM_PROMPT = `你是一个 A 股交易记录解析助手。
 规则：
 - 只返回 JSON 数组，不要包含解释文字、markdown 代码块、注释
 - 图片中没有交易记录返回 []
+- stockCode：若图片中可见6位代码则直接填写；若未显示代码但能根据股票名称确认（如"沪电股份"=002463，"贵州茅台"=600519），可填写推断值；完全不确定则填 null
 - 不支持港股/美股，遇到非A股代码返回 confidence < 0.5
 - 数量单位是"股"，若图片显示为"手"则乘以 100`;
 
@@ -67,19 +68,22 @@ async function callVisionAPI(
             ],
           },
         ],
-        generationConfig: { maxOutputTokens: 2000 },
+        generationConfig: { maxOutputTokens: 8192 },
       }),
       dispatcher,
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) {
       const errText = await res.text();
+      console.error("[vision/gemini] API error", res.status, errText.slice(0, 300));
       throw new Error(`API 错误 ${res.status}: ${errText.slice(0, 120)}`);
     }
     const json = await res.json() as {
       candidates?: { content?: { parts?: { text?: string }[] } }[];
     };
-    return json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    console.log("[vision/gemini] raw response:", text.slice(0, 500));
+    return text;
   }
 
   // OpenAI-compatible (openai + deepseek)
@@ -91,7 +95,7 @@ async function callVisionAPI(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2000,
+      max_tokens: 8192,
       messages: [
         {
           role: "user",
@@ -155,10 +159,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? "https://api.openai.com/v1/chat/completions"
       : "https://api.deepseek.com/chat/completions";
   const defaultModel =
-    provider === "gemini" ? "gemini-2.0-flash" : provider === "openai" ? "gpt-4o" : "deepseek-chat";
+    provider === "gemini" ? "gemini-2.5-flash" : provider === "openai" ? "gpt-4o" : "deepseek-chat";
 
   const apiUrl = process.env.VISION_API_URL ?? defaultUrl;
   const model = process.env.VISION_MODEL ?? defaultModel;
+  console.log(`[vision] provider=${provider} model=${model}`);
 
   // Parse multipart form data
   let formData: FormData;
@@ -206,23 +211,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         continue;
       }
 
-      // Strip markdown code block if present
+      // Strip markdown code block if present (trim first to handle leading whitespace)
       const jsonStr = raw
+        .trim()
         .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```\s*$/, "")
+        .replace(/\s*```\s*$/i, "")
         .trim();
 
+      console.log("[vision] jsonStr preview:", JSON.stringify(jsonStr.slice(0, 300)));
       let trades: RecognizedTrade[];
       try {
         const parsed = JSON.parse(jsonStr) as unknown;
-        if (!Array.isArray(parsed)) throw new Error("Expected array");
-        trades = parsed.filter((t): t is RecognizedTrade =>
-          typeof t === "object" && t !== null &&
-          typeof (t as Record<string, unknown>).stockCode === "string" &&
-          typeof (t as Record<string, unknown>).price === "number" &&
-          typeof (t as Record<string, unknown>).quantity === "number"
-        );
-      } catch {
+        if (!Array.isArray(parsed)) {
+          console.error("[vision] not array, got:", typeof parsed, JSON.stringify(String(parsed)).slice(0, 100));
+          throw new Error("Expected array");
+        }
+        trades = (parsed as Record<string, unknown>[])
+          .filter((t) =>
+            typeof t === "object" && t !== null &&
+            typeof t.price === "number" &&
+            typeof t.quantity === "number"
+          )
+          .map((t) => ({
+            ...t,
+            stockCode: typeof t.stockCode === "string" ? t.stockCode : "",
+            stockName: typeof t.stockName === "string" ? t.stockName : "",
+            action: (["BUY","ADD","SELL","REDUCE","CLEAR"].includes(t.action as string) ? t.action : "BUY") as RecognizedTrade["action"],
+            price: t.price as number,
+            quantity: t.quantity as number,
+            tradedAt: typeof t.tradedAt === "string" ? t.tradedAt : null,
+            confidence: typeof t.confidence === "number" ? t.confidence : 0.5,
+          } as RecognizedTrade));
+      } catch (parseErr) {
+        console.error("[vision] JSON.parse failed:", parseErr, "jsonStr:", JSON.stringify(jsonStr.slice(0, 200)));
         errors.push({ imageIndex: i, reason: "AI 返回格式无法解析，请重试或使用更清晰的截图" });
         continue;
       }

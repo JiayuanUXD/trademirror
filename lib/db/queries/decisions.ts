@@ -86,6 +86,42 @@ export async function updateDecision(
   return updated;
 }
 
+/** 补全由批量导入创建的 incomplete 决策卡（仅允许在 incomplete=1 时调用）。 */
+export async function completeDecision(
+  id: string,
+  userId: string,
+  patch: {
+    reason: string;
+    basis: DecisionBasis[];
+    systemAlignment: "ALIGN" | "PARTIAL" | "NOT_ALIGN";
+    calmScore: number;
+    confidenceScore: number;
+    fomoScore: number;
+    stopLossPrice: number;
+    maxAcceptableLoss: number;
+    dangerSignals: DangerSignal[];
+  }
+): Promise<Decision> {
+  const set: Record<string, unknown> = {
+    reason: patch.reason,
+    basis: JSON.stringify(patch.basis),
+    systemAlignment: patch.systemAlignment,
+    calmScore: patch.calmScore,
+    confidenceScore: patch.confidenceScore,
+    fomoScore: patch.fomoScore,
+    stopLossPrice: patch.stopLossPrice,
+    maxAcceptableLoss: patch.maxAcceptableLoss,
+    dangerSignals: JSON.stringify(patch.dangerSignals),
+    incomplete: 0,
+  };
+  await db.update(decisions).set(set).where(
+    and(eq(decisions.id, id), eq(decisions.userId, userId))
+  );
+  const updated = await getDecisionById(id, userId);
+  if (!updated) throw new Error("Decision not found");
+  return updated;
+}
+
 export async function createDecision(input: InsertDecision, userId: string): Promise<Decision> {
   const row = {
     ...input,

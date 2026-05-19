@@ -6,8 +6,8 @@ import Link from "next/link";
 import dayjs from "dayjs";
 import { DecisionTracking } from "./decision-tracking";
 import { ErrorTagger } from "@/components/errors/error-tagger";
-import { ACTION_LABELS, RATIONAL_BASIS, ALIGNMENT_LABELS, STATUS_LABELS, VOIDED_REASON_LABELS } from "@/types/decision";
-import type { Decision, VoidedReason } from "@/types/decision";
+import { ACTION_LABELS, RATIONAL_BASIS, IRRATIONAL_BASIS, ALIGNMENT_LABELS, STATUS_LABELS, VOIDED_REASON_LABELS } from "@/types/decision";
+import type { Decision, VoidedReason, DecisionBasis } from "@/types/decision";
 
 type ErrorLog = {
   id: string;
@@ -74,6 +74,20 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showVoidConfirm, setShowVoidConfirm] = useState(false);
   const [voidReason, setVoidReason] = useState<VoidedReason>("INPUT_ERROR");
+
+  // Completion form state
+  const [showCompleteForm, setShowCompleteForm] = useState(false);
+  const [completeForm, setCompleteForm] = useState({
+    reason: "",
+    basis: [] as DecisionBasis[],
+    systemAlignment: "ALIGN" as "ALIGN" | "PARTIAL" | "NOT_ALIGN",
+    calmScore: 5,
+    confidenceScore: 5,
+    fomoScore: 3,
+    stopLossPrice: "",
+  });
+  const [completeLoading, setCompleteLoading] = useState(false);
+  const [completeError, setCompleteError] = useState("");
 
   const open = decisionId !== null;
 
@@ -154,6 +168,36 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
       }
     } catch { /* keep */ }
     finally { setActionLoading(null); }
+  }
+
+  async function handleComplete() {
+    if (!decisionId) return;
+    const stopLoss = parseFloat(completeForm.stopLossPrice);
+    if (!completeForm.reason.trim()) { setCompleteError("请填写决策理由"); return; }
+    if (completeForm.basis.length === 0) { setCompleteError("请至少选择一项决策依据"); return; }
+    if (isNaN(stopLoss) || stopLoss <= 0) { setCompleteError("请输入有效的止损价格"); return; }
+    setCompleteError("");
+    setCompleteLoading(true);
+    try {
+      const res = await fetch(`/api/decisions/${decisionId}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...completeForm, stopLossPrice: stopLoss }),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        setCompleteError(err.error ?? "补全失败，请重试");
+        return;
+      }
+      const updated = await res.json() as Decision;
+      setDecision(updated);
+      setShowCompleteForm(false);
+      onDecisionChange?.();
+    } catch {
+      setCompleteError("网络错误，请重试");
+    } finally {
+      setCompleteLoading(false);
+    }
   }
 
   const isBuy = decision && (decision.action === "BUY" || decision.action === "ADD");
@@ -255,21 +299,173 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
 
           {!loading && decision && (
             <div className="px-5 py-5 space-y-5">
-              {/* Incomplete banner */}
+              {/* Incomplete banner + inline completion form */}
               {decision.incomplete && isActive && (
                 <div
-                  className="flex items-start gap-2 px-4 py-3 rounded-lg border"
-                  style={{ backgroundColor: "rgba(245,158,11,0.07)", borderColor: "rgba(245,158,11,0.3)" }}
+                  className="rounded-lg border overflow-hidden"
+                  style={{ borderColor: "rgba(245,158,11,0.35)" }}
                 >
-                  <PenLine size={15} className="shrink-0 mt-0.5" style={{ color: "var(--brand-warning)" }} />
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: "var(--brand-warning)" }}>
+                  {/* Banner row */}
+                  <div
+                    className="flex items-center gap-2 px-4 py-3"
+                    style={{ backgroundColor: "rgba(245,158,11,0.07)" }}
+                  >
+                    <PenLine size={15} className="shrink-0" style={{ color: "var(--brand-warning)" }} />
+                    <p className="flex-1 text-sm font-medium" style={{ color: "var(--brand-warning)" }}>
                       此决策卡尚未补全
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-                      请在下方补填情绪评分、决策依据和止损价格，让数据更真实
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowCompleteForm((v) => !v)}
+                      className="text-xs font-medium px-3 py-1 rounded-md transition-colors"
+                      style={{
+                        backgroundColor: showCompleteForm ? "rgba(245,158,11,0.2)" : "rgba(245,158,11,0.12)",
+                        color: "var(--brand-warning)",
+                      }}
+                    >
+                      {showCompleteForm ? "收起" : "立即补全"}
+                    </button>
                   </div>
+
+                  {/* Inline completion form */}
+                  {showCompleteForm && (
+                    <div className="px-4 py-4 space-y-4" style={{ backgroundColor: "var(--surface-card)" }}>
+                      {/* Reason */}
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                          一句话理由 *
+                        </label>
+                        <input
+                          className="w-full h-9 px-3 rounded-md text-sm border"
+                          style={{ backgroundColor: "var(--surface-base)", borderColor: "var(--border-subtle)", color: "var(--foreground)" }}
+                          placeholder="为什么做这笔交易？"
+                          value={completeForm.reason}
+                          onChange={(e) => setCompleteForm((p) => ({ ...p, reason: e.target.value }))}
+                        />
+                      </div>
+
+                      {/* Basis */}
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                          决策依据 * <span className="font-normal">（可多选）</span>
+                        </label>
+                        <div className="space-y-2">
+                          <p className="text-[11px]" style={{ color: "var(--brand-green)" }}>理性依据</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {RATIONAL_BASIS.map((b) => {
+                              const selected = completeForm.basis.includes(b);
+                              return (
+                                <button key={b} type="button"
+                                  onClick={() => setCompleteForm((p) => ({
+                                    ...p,
+                                    basis: selected ? p.basis.filter((x) => x !== b) : [...p.basis, b],
+                                  }))}
+                                  className="text-[11px] px-2 py-1 rounded transition-colors"
+                                  style={{
+                                    backgroundColor: selected ? "rgba(34,197,94,0.15)" : "var(--surface-overlay)",
+                                    color: selected ? "var(--brand-green)" : "var(--muted-foreground)",
+                                    border: `1px solid ${selected ? "rgba(34,197,94,0.4)" : "var(--border-subtle)"}`,
+                                  }}
+                                >{b}</button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>非理性依据</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {IRRATIONAL_BASIS.map((b) => {
+                              const selected = completeForm.basis.includes(b);
+                              return (
+                                <button key={b} type="button"
+                                  onClick={() => setCompleteForm((p) => ({
+                                    ...p,
+                                    basis: selected ? p.basis.filter((x) => x !== b) : [...p.basis, b],
+                                  }))}
+                                  className="text-[11px] px-2 py-1 rounded transition-colors"
+                                  style={{
+                                    backgroundColor: selected ? "rgba(239,68,68,0.15)" : "var(--surface-overlay)",
+                                    color: selected ? "var(--brand-red)" : "var(--muted-foreground)",
+                                    border: `1px solid ${selected ? "rgba(239,68,68,0.4)" : "var(--border-subtle)"}`,
+                                  }}
+                                >{b}</button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* System alignment */}
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                          符合交易体系
+                        </label>
+                        <div className="flex gap-2">
+                          {(Object.entries(ALIGNMENT_LABELS) as [keyof typeof ALIGNMENT_LABELS, string][]).map(([k, v]) => {
+                            const colors: Record<string, string> = { ALIGN: "var(--brand-green)", PARTIAL: "var(--brand-warning)", NOT_ALIGN: "var(--brand-red)" };
+                            const selected = completeForm.systemAlignment === k;
+                            return (
+                              <button key={k} type="button"
+                                onClick={() => setCompleteForm((p) => ({ ...p, systemAlignment: k }))}
+                                className="flex-1 text-xs py-1.5 rounded-md transition-colors"
+                                style={{
+                                  backgroundColor: selected ? `${colors[k]}22` : "var(--surface-overlay)",
+                                  color: selected ? colors[k] : "var(--muted-foreground)",
+                                  border: `1px solid ${selected ? `${colors[k]}55` : "var(--border-subtle)"}`,
+                                }}
+                              >{v}</button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Scores */}
+                      <div className="grid grid-cols-3 gap-3">
+                        {(["calmScore", "confidenceScore", "fomoScore"] as const).map((key) => {
+                          const labels: Record<string, string> = { calmScore: "平静度", confidenceScore: "信心度", fomoScore: "FOMO" };
+                          return (
+                            <div key={key}>
+                              <label className="text-xs block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                                {labels[key]} <span style={{ color: "var(--foreground)" }}>{completeForm[key]}</span>
+                              </label>
+                              <input type="range" min={1} max={10}
+                                value={completeForm[key]}
+                                onChange={(e) => setCompleteForm((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                                className="w-full"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Stop loss */}
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                          止损价格 * <span className="font-normal">（入场价 ¥{decision.price}）</span>
+                        </label>
+                        <input
+                          type="number"
+                          className="w-full h-9 px-3 rounded-md text-sm border"
+                          style={{ backgroundColor: "var(--surface-base)", borderColor: "var(--border-subtle)", color: "var(--foreground)" }}
+                          placeholder={`建议 ¥${(decision.price * 0.92).toFixed(2)}`}
+                          value={completeForm.stopLossPrice}
+                          onChange={(e) => setCompleteForm((p) => ({ ...p, stopLossPrice: e.target.value }))}
+                        />
+                      </div>
+
+                      {completeError && (
+                        <p className="text-xs" style={{ color: "var(--brand-red)" }}>{completeError}</p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleComplete}
+                        disabled={completeLoading}
+                        className="w-full h-10 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-50"
+                        style={{ backgroundColor: "var(--brand-blue)" }}
+                      >
+                        {completeLoading ? "保存中…" : "完成补全"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

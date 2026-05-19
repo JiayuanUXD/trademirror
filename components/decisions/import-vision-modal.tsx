@@ -74,7 +74,8 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
       setApiErrors(data.errors ?? []);
 
       if (data.trades.length === 0 && (data.errors?.length ?? 0) === files.length) {
-        setProcessError("所有图片均识别失败，请尝试更清晰的截图");
+        const firstReason = data.errors?.[0]?.reason;
+        setProcessError(firstReason ? `识别失败：${firstReason}` : "所有图片均识别失败，请尝试更清晰的截图");
         setStep("upload");
         return;
       }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { batchCreateDecisions, type BatchInsertDecision } from "@/lib/db/queries/decisions";
+import { syncHoldingFromDecision } from "@/lib/db/queries/holdings";
 import { z } from "zod";
 
 function inferMarket(code: string): "SH" | "SZ" | "BJ" {
@@ -47,6 +48,14 @@ export async function POST(req: NextRequest) {
   }));
 
   const result = await batchCreateDecisions(items, userId);
+
+  // 同步持仓档案（fire-and-forget）
+  for (const d of result.created) {
+    syncHoldingFromDecision(
+      { stockCode: d.stockCode, action: d.action, price: d.price, quantity: d.quantity },
+      userId
+    ).catch((e) => console.error("[syncHolding/batch]", e));
+  }
 
   const status = result.failed.length > 0 && result.created.length === 0 ? 500 : 207;
   return NextResponse.json(result, { status });

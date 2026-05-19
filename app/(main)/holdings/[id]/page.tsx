@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { getHoldingById } from "@/lib/db/queries/holdings";
-import { getDecisions } from "@/lib/db/queries/decisions";
+import { getDecisionsByStockCode } from "@/lib/db/queries/decisions";
 import { HoldingDetailTabs } from "@/components/holdings/holding-detail-tabs";
 import { STATUS_LABELS, STATUS_COLORS } from "@/types/holding";
 
@@ -17,17 +17,10 @@ export default async function HoldingDetailPage({ params }: Props) {
   if (!userId) return null;
 
   const { id } = await params;
-  const [holding, allDecisions] = await Promise.all([
-    getHoldingById(id, userId),
-    getDecisions(userId),
-  ]);
-
+  const holding = await getHoldingById(id, userId);
   if (!holding) notFound();
 
-  // Filter decisions for this stock
-  const relatedDecisions = allDecisions.filter(
-    (d) => d.stockCode === holding.stockCode
-  );
+  const relatedDecisions = await getDecisionsByStockCode(holding.stockCode, userId);
 
   const pnlPct =
     holding.currentPrice && holding.costPrice

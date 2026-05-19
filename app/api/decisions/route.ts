@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { createDecisionSchema } from "@/lib/validators/decision";
 import { createDecision, getDecisions } from "@/lib/db/queries/decisions";
+import { syncHoldingFromDecision } from "@/lib/db/queries/holdings";
 import { calcDangerSignals } from "@/lib/danger-signals";
 import type { DecisionStatus } from "@/types/decision";
 
@@ -79,6 +80,12 @@ export async function POST(req: NextRequest) {
       parentId: (rawBody.parentId as string) ?? null,
       createdAt: data.tradedAt || Date.now(),
     }, userId);
+
+    // 同步持仓档案（fire-and-forget，失败不影响决策卡创建）
+    syncHoldingFromDecision(
+      { stockCode: decision.stockCode, action: decision.action, price: decision.price, quantity: decision.quantity },
+      userId
+    ).catch((e) => console.error("[syncHolding]", e));
 
     return NextResponse.json(decision, { status: 201 });
   } catch (err) {

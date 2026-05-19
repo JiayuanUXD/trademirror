@@ -42,6 +42,60 @@ export async function getHoldingById(id: string, userId: string): Promise<Holdin
   return rows[0] ? rowToHolding(rows[0]) : null;
 }
 
+export async function getHoldingByStockCode(stockCode: string, userId: string): Promise<Holding | null> {
+  const rows = await db
+    .select()
+    .from(holdings)
+    .where(and(eq(holdings.stockCode, stockCode), eq(holdings.userId, userId)))
+    .limit(1);
+  return rows[0] ? rowToHolding(rows[0]) : null;
+}
+
+/**
+ * 决策卡提交后同步持仓的 shares 和 costPrice。
+ * 仅更新已存在的持仓档案，不自动创建新档案。
+ *
+ * BUY / ADD  → 加权平均成本 + 增加股数；若持仓已 CLOSED 则重新开启
+ * SELL / REDUCE → 减少股数，成本不变
+ * CLEAR      → 股数清零，状态改为 CLOSED
+ */
+export async function syncHoldingFromDecision(
+  decision: {
+    stockCode: string;
+    action: "BUY" | "ADD" | "SELL" | "REDUCE" | "CLEAR";
+    price: number;
+    quantity: number;
+  },
+  userId: string
+): Promise<void> {
+  const holding = await getHoldingByStockCode(decision.stockCode, userId);
+  if (!holding) return; // 无对应持仓档案，不处理
+
+  const now = Date.now();
+  const patch: Record<string, unknown> = { updatedAt: now };
+
+  if (decision.action === "BUY" || decision.action === "ADD") {
+    const newShares = holding.shares + decision.quantity;
+    const newCostPrice =
+      newShares === 0
+        ? decision.price
+        : Math.round(
+            ((holding.costPrice * holding.shares + decision.price * decision.quantity) / newShares) * 1000
+          ) / 1000;
+    patch.shares = newShares;
+    patch.costPrice = newCostPrice;
+    // 若持仓已清仓，重新开启
+    if (holding.status === "CLOSED") patch.status = "HOLDING";
+  } else if (decision.action === "SELL" || decision.action === "REDUCE") {
+    patch.shares = Math.max(0, holding.shares - decision.quantity);
+  } else if (decision.action === "CLEAR") {
+    patch.shares = 0;
+    patch.status = "CLOSED";
+  }
+
+  await db.update(holdings).set(patch).where(and(eq(holdings.stockCode, decision.stockCode), eq(holdings.userId, userId)));
+}
+
 export type InsertHolding = Omit<
   typeof holdings.$inferInsert,
   "logic" | "prerequisites" | "exitConditions" | "userId"

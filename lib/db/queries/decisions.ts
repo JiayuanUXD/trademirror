@@ -36,6 +36,15 @@ export async function getDecisions(
   return rows.map(rowToDecision);
 }
 
+export async function getDecisionsByStockCode(stockCode: string, userId: string): Promise<Decision[]> {
+  const rows = await db
+    .select()
+    .from(decisions)
+    .where(and(eq(decisions.stockCode, stockCode), eq(decisions.userId, userId)))
+    .orderBy(desc(decisions.createdAt));
+  return rows.map(rowToDecision);
+}
+
 export async function getDecisionById(id: string, userId: string): Promise<Decision | null> {
   const rows = await db
     .select()

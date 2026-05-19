@@ -20,20 +20,33 @@ async function attachStats(
 ): Promise<WeeklyReview> {
   const items = JSON.parse(row.disciplineItems) as DisciplineItem[];
 
-  const weekDecisions = await db
-    .select()
-    .from(decisions)
-    .where(and(
-      gte(decisions.createdAt, row.weekStart),
-      lte(decisions.createdAt, row.weekEnd),
-      eq(decisions.userId, userId),
-    ));
+  // Select only the fields we need to avoid issues with newly added columns
+  // during migration and to keep this query lightweight
+  let weekDecisionCount = 0;
+  let dangerTradeCount = 0;
+  let highFomoCount = 0;
 
-  const weekDecisionCount = weekDecisions.length;
-  const dangerTradeCount = weekDecisions.filter(
-    (d) => (JSON.parse(d.dangerSignals) as string[]).length > 0
-  ).length;
-  const highFomoCount = weekDecisions.filter((d) => d.fomoScore >= 7).length;
+  try {
+    const weekDecisions = await db
+      .select({
+        fomoScore: decisions.fomoScore,
+        dangerSignals: decisions.dangerSignals,
+      })
+      .from(decisions)
+      .where(and(
+        gte(decisions.createdAt, row.weekStart),
+        lte(decisions.createdAt, row.weekEnd),
+        eq(decisions.userId, userId),
+      ));
+
+    weekDecisionCount = weekDecisions.length;
+    dangerTradeCount = weekDecisions.filter(
+      (d) => (JSON.parse(d.dangerSignals) as string[]).length > 0
+    ).length;
+    highFomoCount = weekDecisions.filter((d) => d.fomoScore >= 7).length;
+  } catch (err) {
+    console.error("[db] attachStats failed — returning zero counts", err);
+  }
 
   return {
     ...row,
@@ -80,7 +93,7 @@ export async function createReview(
   userId: string
 ): Promise<WeeklyReview> {
   const weekDecisions = await db
-    .select()
+    .select({ id: decisions.id })
     .from(decisions)
     .where(and(
       gte(decisions.createdAt, weekStart),

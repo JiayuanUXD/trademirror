@@ -117,6 +117,7 @@ const CREATE_TABLES = [
     voided_reason TEXT,
     voided_at INTEGER,
     parent_id TEXT,
+    incomplete INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     user_id TEXT NOT NULL
   )`,
@@ -279,7 +280,7 @@ async function recreateTable(
 
 export async function runMigrations(): Promise<void> {
   if (migrated) return;
-  migrated = true;
+  // NOTE: migrated is set to true only AFTER successful completion to allow retries
 
   try {
     // Phase 1: Create tables (fresh install) or no-op (existing DB)
@@ -289,14 +290,13 @@ export async function runMigrations(): Promise<void> {
     );
     console.log("[db] tables ok");
 
-    // Phase 2: Add userId columns (existing DBs created before auth)
+    // Phase 2: Add columns (existing DBs created before certain features)
     for (const t of ALTER_TABLES) {
       await addColumnIfMissing(t.table, t.column, t.def);
     }
 
     // Phase 3: Migrate isArchived → status (for DBs created before the status column)
     try {
-      // Check if is_archived column still exists
       const colCheck = await client.execute({
         sql: `SELECT 1 FROM pragma_table_info('decisions') WHERE name='is_archived' LIMIT 1`,
         args: [],
@@ -310,23 +310,22 @@ export async function runMigrations(): Promise<void> {
       }
     } catch { /* is_archived column may not exist on fresh DBs */ }
 
-    // Phase 5: Create indexes (columns guaranteed to exist now)
+    // Phase 4: Create indexes (columns guaranteed to exist now)
     await client.batch(
       CREATE_INDEXES.map((sql) => ({ sql, args: [] })),
       "write"
     );
     console.log("[db] indexes ok");
 
-    // Phase 6: Fix unique constraints on tables created before multi-user support
+    // Phase 5: Fix unique constraints on tables created before multi-user support
     const weeklyReviewsDDL = CREATE_TABLES.find((s) => s.includes("weekly_reviews"))!;
     const monthlyPortraitsDDL = CREATE_TABLES.find((s) => s.includes("monthly_portraits"))!;
     await recreateTable("weekly_reviews", weeklyReviewsDDL);
     await recreateTable("monthly_portraits", monthlyPortraitsDDL);
 
-    // Phase 7: Seed data
+    // Phase 6: Seed data
     const now = Date.now();
 
-    // Preset error types (INSERT OR IGNORE — idempotent)
     await db
       .insert(schema.errorTypes)
       .values(
@@ -341,7 +340,6 @@ export async function runMigrations(): Promise<void> {
       )
       .onConflictDoNothing();
 
-    // Admin account
     const hash = await bcrypt.hash("admin123", 12);
     await db
       .insert(schema.users)
@@ -356,14 +354,15 @@ export async function runMigrations(): Promise<void> {
       })
       .onConflictDoNothing();
 
-    // Fix legacy admin email (.local TLD rejected by browser email validation)
     await db
       .update(schema.users)
       .set({ email: "admin@trademirror.com" })
       .where(eq(schema.users.email, "jiayuan@trademirror.local"));
 
     console.log("[db] migrations done");
+    migrated = true; // ← Set ONLY after all phases complete successfully
   } catch (err) {
-    console.error("[db] migration error", err);
+    console.error("[db] migration error — will retry on next request", err);
+    // migrated remains false so the next request will retry
   }
 }

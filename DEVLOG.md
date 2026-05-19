@@ -96,6 +96,16 @@
 
 **环境变量**：`VISION_API_KEY`（可选，默认用 `OPENAI_API_KEY` 或 `DEEPSEEK_API_KEY`）、`VISION_API_URL`、`VISION_MODEL`（默认 `gpt-4o` / `deepseek-chat`）
 
+### 图片识别新增 Gemini 支持
+
+- `app/api/decisions/import-vision/route.ts`：新增 `Provider` 类型（`"openai" | "gemini" | "deepseek"`）
+- 提取 `callVisionAPI()` 函数，统一封装三种 API 的调用差异：
+  - **OpenAI / DeepSeek**：OpenAI-compatible messages 格式，`image_url` + base64 data URL
+  - **Gemini**：`contents[].parts[]` 格式，`inlineData.data` (base64) + `inlineData.mimeType`，endpoint `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}`，响应从 `candidates[0].content.parts[0].text` 取文本
+- Provider 优先级：`VISION_API_KEY` / `OPENAI_API_KEY` → `GEMINI_API_KEY` → `DEEPSEEK_API_KEY`
+- 默认模型：OpenAI=`gpt-4o`，Gemini=`gemini-2.0-flash`，DeepSeek=`deepseek-chat`
+- **新增环境变量**：`GEMINI_API_KEY`（配置后自动使用 Gemini 作为视觉识别后端）
+
 ### 代码审查修复（12项）
 
 根据 2026-05-18 代码审查结果，按优先级逐一修复：

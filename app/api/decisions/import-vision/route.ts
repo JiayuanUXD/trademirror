@@ -42,30 +42,123 @@ const SYSTEM_PROMPT = `你是一个 A 股交易记录解析助手。
 - 不支持港股/美股，遇到非A股代码返回 confidence < 0.5
 - 数量单位是"股"，若图片显示为"手"则乘以 100`;
 
+type Provider = "openai" | "gemini" | "deepseek";
+
+async function callVisionAPI(
+  provider: Provider,
+  apiKey: string,
+  apiUrl: string,
+  model: string,
+  mimeType: string,
+  base64: string,
+  dispatcher: ReturnType<typeof makeDispatcher>
+): Promise<string> {
+  if (provider === "gemini") {
+    const url = `${apiUrl}/${model}:generateContent?key=${apiKey}`;
+    const res = await undiciFetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { inlineData: { mimeType, data: base64 } },
+              { text: SYSTEM_PROMPT },
+            ],
+          },
+        ],
+        generationConfig: { maxOutputTokens: 2000 },
+      }),
+      dispatcher,
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`API 错误 ${res.status}: ${errText.slice(0, 120)}`);
+    }
+    const json = await res.json() as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    return json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  }
+
+  // OpenAI-compatible (openai + deepseek)
+  const res = await undiciFetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 2000,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${base64}`, detail: "high" },
+            },
+            { type: "text", text: SYSTEM_PROMPT },
+          ],
+        },
+      ],
+    }),
+    dispatcher,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`API 错误 ${res.status}: ${errText.slice(0, 120)}`);
+  }
+  const json = await res.json() as {
+    choices?: { message?: { content?: string } }[];
+  };
+  return json.choices?.[0]?.message?.content ?? "";
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Determine API provider
+  // Determine API provider — priority: VISION_API_KEY > OPENAI_API_KEY > GEMINI_API_KEY > DEEPSEEK_API_KEY
   const openaiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
-  const apiKey = process.env.VISION_API_KEY ?? openaiKey ?? deepseekKey;
+  const visionKey = process.env.VISION_API_KEY;
 
-  if (!apiKey) {
+  let provider: Provider;
+  let apiKey: string;
+
+  if (visionKey ?? openaiKey) {
+    provider = "openai";
+    apiKey = (visionKey ?? openaiKey)!;
+  } else if (geminiKey) {
+    provider = "gemini";
+    apiKey = geminiKey;
+  } else if (deepseekKey) {
+    provider = "deepseek";
+    apiKey = deepseekKey;
+  } else {
     return NextResponse.json(
-      { error: "未配置视觉 API Key。请在环境变量中设置 OPENAI_API_KEY 或 DEEPSEEK_API_KEY。" },
+      { error: "未配置视觉 API Key。请在环境变量中设置 OPENAI_API_KEY、GEMINI_API_KEY 或 DEEPSEEK_API_KEY。" },
       { status: 503 }
     );
   }
 
-  const isOpenAI = !!(process.env.VISION_API_KEY ?? openaiKey);
-  const apiUrl =
-    process.env.VISION_API_URL ??
-    (isOpenAI
+  const defaultUrl =
+    provider === "gemini"
+      ? "https://generativelanguage.googleapis.com/v1beta/models"
+      : provider === "openai"
       ? "https://api.openai.com/v1/chat/completions"
-      : "https://api.deepseek.com/chat/completions");
-  const model = process.env.VISION_MODEL ?? (isOpenAI ? "gpt-4o" : "deepseek-chat");
+      : "https://api.deepseek.com/chat/completions";
+  const defaultModel =
+    provider === "gemini" ? "gemini-2.0-flash" : provider === "openai" ? "gpt-4o" : "deepseek-chat";
+
+  const apiUrl = process.env.VISION_API_URL ?? defaultUrl;
+  const model = process.env.VISION_MODEL ?? defaultModel;
 
   // Parse multipart form data
   let formData: FormData;
@@ -101,44 +194,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const base64 = Buffer.from(arrayBuffer).toString("base64");
-      const dataUrl = `data:${file.type};base64,${base64}`;
 
-      const res = await undiciFetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 2000,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "image_url",
-                  image_url: { url: dataUrl, detail: "high" },
-                },
-                { type: "text", text: SYSTEM_PROMPT },
-              ],
-            },
-          ],
-        }),
-        dispatcher,
-        signal: AbortSignal.timeout(30_000),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text();
-        errors.push({ imageIndex: i, reason: `API 错误 ${res.status}: ${errText.slice(0, 120)}` });
+      let raw: string;
+      try {
+        raw = await callVisionAPI(provider, apiKey, apiUrl, model, file.type, base64, dispatcher);
+      } catch (err) {
+        errors.push({
+          imageIndex: i,
+          reason: err instanceof Error ? err.message : "识别失败，请重试",
+        });
         continue;
       }
-
-      const json = await res.json() as {
-        choices?: { message?: { content?: string } }[];
-      };
-      const raw = json.choices?.[0]?.message?.content ?? "";
 
       // Strip markdown code block if present
       const jsonStr = raw
@@ -165,7 +231,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch (err) {
       errors.push({
         imageIndex: i,
-        reason: err instanceof Error ? err.message : "识别失败，请重试",
+        reason: err instanceof Error ? err.message : "解析失败，请重试",
       });
     }
   }

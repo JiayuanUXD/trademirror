@@ -12,6 +12,7 @@ function rowToDecision(row: typeof decisions.$inferSelect): Decision {
     voidedReason: (row.voidedReason ?? null) as VoidedReason | null,
     voidedAt: row.voidedAt ?? null,
     parentId: row.parentId ?? null,
+    incomplete: row.incomplete === 1,
   };
 }
 
@@ -87,6 +88,65 @@ export async function createDecision(input: InsertDecision, userId: string): Pro
   const created = await getDecisionById(input.id, userId);
   if (!created) throw new Error("Failed to create decision");
   return created;
+}
+
+export type BatchInsertDecision = {
+  id: string;
+  stockCode: string;
+  stockName: string;
+  stockMarket: "SH" | "SZ" | "BJ";
+  action: "BUY" | "ADD" | "SELL" | "REDUCE" | "CLEAR";
+  price: number;
+  quantity: number;
+  tradedAt?: number;
+};
+
+export async function batchCreateDecisions(
+  items: BatchInsertDecision[],
+  userId: string
+): Promise<{ created: Decision[]; failed: { index: number; reason: string }[] }> {
+  const created: Decision[] = [];
+  const failed: { index: number; reason: string }[] = [];
+  const now = Date.now();
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    try {
+      const stopLossPrice = parseFloat((item.price * 0.92).toFixed(2));
+      const amount = parseFloat((item.price * item.quantity).toFixed(2));
+      const row = {
+        id: item.id,
+        stockCode: item.stockCode,
+        stockName: item.stockName,
+        stockMarket: item.stockMarket,
+        action: item.action,
+        price: item.price,
+        quantity: item.quantity,
+        amount,
+        reason: "批量导入，待补全",
+        basis: "[]",
+        systemAlignment: "ALIGN" as const,
+        calmScore: 5,
+        confidenceScore: 5,
+        fomoScore: 3,
+        stopLossPrice,
+        maxAcceptableLoss: parseFloat((Math.abs(item.price - stopLossPrice) * item.quantity).toFixed(2)),
+        dangerSignals: "[]",
+        status: "ACTIVE" as const,
+        incomplete: 1,
+        createdAt: item.tradedAt ?? now,
+        userId,
+      };
+      await db.insert(decisions).values(row);
+      const decision = await getDecisionById(item.id, userId);
+      if (!decision) throw new Error("Insert succeeded but row not found");
+      created.push(decision);
+    } catch (err) {
+      failed.push({ index: i, reason: err instanceof Error ? err.message : "未知错误" });
+    }
+  }
+
+  return { created, failed };
 }
 
 export async function voidDecision(

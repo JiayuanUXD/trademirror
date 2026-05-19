@@ -101,6 +101,7 @@ export type Decision = {
   voidedReason: VoidedReason | null;
   voidedAt: number | null;
   parentId: string | null;
+  incomplete: boolean;
   createdAt: number;
 };
 

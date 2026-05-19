@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, AlertTriangle, TrendingUp, TrendingDown, Ban, Archive } from "lucide-react";
+import { Plus, AlertTriangle, TrendingUp, TrendingDown, Ban, Archive, Camera, PenLine } from "lucide-react";
 import { ACTION_LABELS, type DecisionAction, type DecisionStatus } from "@/types/decision";
 import type { Decision } from "@/types/decision";
 import { DecisionSheet } from "./decision-sheet";
+import { ImportVisionModal } from "./import-vision-modal";
 import dayjs from "dayjs";
 
 const ACTION_COLORS: Record<DecisionAction, string> = {
@@ -40,15 +41,37 @@ export function DecisionsList({ decisions }: Props) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<DecisionStatus | "ALL">("ALL");
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const filtered = statusFilter === "ALL"
     ? decisions
     : decisions.filter((d) => d.status === statusFilter);
 
+  const incompleteCount = decisions.filter((d) => d.incomplete && d.status === "ACTIVE").length;
+
   return (
     <>
-      {/* Status filter tabs */}
-      {decisions.length > 0 && (
+      {/* Incomplete banner */}
+      {incompleteCount > 0 && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{
+            backgroundColor: "rgba(245,158,11,0.08)",
+            border: "1px solid rgba(245,158,11,0.25)",
+          }}
+        >
+          <PenLine size={15} className="shrink-0" style={{ color: "var(--brand-warning)" }} />
+          <p className="flex-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <span className="font-semibold" style={{ color: "var(--brand-warning)" }}>
+              {incompleteCount} 张
+            </span>{" "}
+            批量导入的决策卡尚未补全情绪评分和决策依据，点击卡片逐一完善
+          </p>
+        </div>
+      )}
+
+      {/* Header row: filter tabs + import button */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex gap-1.5 flex-wrap">
           {STATUS_FILTERS.map((f) => {
             const isActive = statusFilter === f.value;
@@ -69,7 +92,20 @@ export function DecisionsList({ decisions }: Props) {
             );
           })}
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => setShowImportModal(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+          style={{
+            backgroundColor: "var(--surface-overlay)",
+            color: "var(--muted-foreground)",
+            border: "1px solid var(--border-subtle)",
+          }}
+        >
+          <Camera size={13} />
+          截图导入
+        </button>
+      </div>
 
       {/* Empty state */}
       {filtered.length === 0 && decisions.length === 0 && (
@@ -89,14 +125,29 @@ export function DecisionsList({ decisions }: Props) {
           <p className="text-xs mt-1.5 mb-5" style={{ color: "var(--muted-foreground)" }}>
             在下单前先记录你的思考过程，这是最重要的习惯
           </p>
-          <Link
-            href="/decisions/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white"
-            style={{ backgroundColor: "var(--brand-blue)" }}
-          >
-            <Plus size={14} />
-            创建第一张决策卡
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/decisions/new"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white"
+              style={{ backgroundColor: "var(--brand-blue)" }}
+            >
+              <Plus size={14} />
+              创建决策卡
+            </Link>
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-80"
+              style={{
+                backgroundColor: "var(--surface-overlay)",
+                color: "var(--foreground)",
+                border: "1px solid var(--border-subtle)",
+              }}
+            >
+              <Camera size={14} />
+              截图导入
+            </button>
+          </div>
         </div>
       )}
 
@@ -120,6 +171,7 @@ export function DecisionsList({ decisions }: Props) {
             const hasResult = d.return30Days !== null;
             const isVoided = d.status === "VOIDED";
             const isArchived = d.status === "ARCHIVED";
+            const isIncomplete = d.incomplete && d.status === "ACTIVE";
 
             return (
               <button
@@ -163,7 +215,19 @@ export function DecisionsList({ decisions }: Props) {
                       <span className="text-xs font-mono opacity-60" style={{ color: "var(--muted-foreground)" }}>
                         {d.stockCode}
                       </span>
-                      {hasDanger && !isVoided && !isArchived && (
+                      {isIncomplete && (
+                        <span
+                          className="flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded"
+                          style={{
+                            color: "var(--brand-warning)",
+                            backgroundColor: "rgba(245,158,11,0.12)",
+                          }}
+                        >
+                          <PenLine size={10} />
+                          待补全
+                        </span>
+                      )}
+                      {hasDanger && !isVoided && !isArchived && !isIncomplete && (
                         <span
                           className="flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded"
                           style={{
@@ -184,8 +248,12 @@ export function DecisionsList({ decisions }: Props) {
                       style={{ fontSize: "11px", color: "var(--muted-foreground)" }}
                     >
                       <span>¥{d.price.toLocaleString()} × {d.quantity.toLocaleString()} 股</span>
-                      <span className="opacity-40">·</span>
-                      <span>FOMO {d.fomoScore} / 平静 {d.calmScore}</span>
+                      {!isIncomplete && (
+                        <>
+                          <span className="opacity-40">·</span>
+                          <span>FOMO {d.fomoScore} / 平静 {d.calmScore}</span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -219,6 +287,16 @@ export function DecisionsList({ decisions }: Props) {
         onClose={() => setSelectedId(null)}
         onDecisionChange={() => router.refresh()}
       />
+
+      {/* Import modal */}
+      {showImportModal && (
+        <ImportVisionModal
+          onClose={() => {
+            setShowImportModal(false);
+            router.refresh();
+          }}
+        />
+      )}
     </>
   );
 }

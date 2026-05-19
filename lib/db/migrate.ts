@@ -198,6 +198,7 @@ const ALTER_TABLES: { table: string; column: string; def: string }[] = [
   { table: "decisions", column: "voided_reason", def: "TEXT" },
   { table: "decisions", column: "voided_at", def: "INTEGER" },
   { table: "decisions", column: "parent_id", def: "TEXT" },
+  { table: "decisions", column: "incomplete", def: "INTEGER NOT NULL DEFAULT 0" },
 ];
 
 // ─── Preset Error Types ─────────────────────────────────────────────────────

@@ -69,6 +69,33 @@
 
 ## 2026-05-19
 
+### 截图批量导入决策卡
+
+用户上传券商 App 截图，AI 识别交易记录，批量生成待补全的决策卡草稿。
+
+**数据模型**
+- `decisions` 表新增 `incomplete INTEGER NOT NULL DEFAULT 0`（`lib/db/schema.ts`、`lib/db/migrate.ts`）
+- `types/decision.ts`：`Decision` 类型新增 `incomplete: boolean`
+- `lib/db/queries/decisions.ts`：`rowToDecision` 映射 `incomplete`；新增 `batchCreateDecisions()` 批量写入函数，自动推算 `amount`/`stopLossPrice`/`maxAcceptableLoss`
+
+**后端 API**
+- `POST /api/decisions/import-vision`：接收 multipart 图片（最多 5 张），转 base64 后调用 Vision API（优先 `OPENAI_API_KEY` → `DEEPSEEK_API_KEY`），返回结构化 `RecognizedTrade[]` 数组 + 按 `stockCode::tradedAt` 去重
+- `POST /api/decisions/batch`：接收经用户确认的交易数组，Zod 校验，调用 `batchCreateDecisions`，返回 207 Multi-Status
+
+**前端组件**
+- 新建 `components/decisions/import-vision-modal.tsx`：4 步流程（上传 → AI 处理 → 确认编辑表格 → 完成）
+  - 拖拽 / 点击上传，多文件预览缩略图
+  - 识别结果可逐行内联编辑（代码、名称、方向下拉、价格、数量、时间）
+  - 置信度 < 70% 的行橙色高亮提示
+  - 重复记录自动去重
+- `components/decisions/decisions-list.tsx`：
+  - 新增"截图导入"按钮（筛选栏右侧）；空状态增加第二个入口按钮
+  - 待补全卡片显示「待补全」橙色徽标，隐藏 FOMO/平静度（数据无意义）
+  - 顶部黄色 Banner 汇报待补全数量
+- `components/decisions/decision-sheet.tsx`：Sheet 顶部增加"此决策卡尚未补全"提示条
+
+**环境变量**：`VISION_API_KEY`（可选，默认用 `OPENAI_API_KEY` 或 `DEEPSEEK_API_KEY`）、`VISION_API_URL`、`VISION_MODEL`（默认 `gpt-4o` / `deepseek-chat`）
+
 ### 代码审查修复（12项）
 
 根据 2026-05-18 代码审查结果，按优先级逐一修复：

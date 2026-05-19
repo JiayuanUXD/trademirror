@@ -174,6 +174,7 @@ export const decisions = sqliteTable("decisions", {
   voidedReason: text("voided_reason").$type<"INPUT_ERROR" | "DUPLICATE" | "NOT_MINE">(),
   voidedAt: integer("voided_at"),
   parentId: text("parent_id"),
+  incomplete: integer("incomplete").notNull().default(0),
   createdAt: integer("created_at").notNull(),
   userId: text("user_id").notNull(),
 });

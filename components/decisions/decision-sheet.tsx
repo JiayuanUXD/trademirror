@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { X, AlertTriangle, ExternalLink, Archive, Ban, TrendingDown, TrendingUp } from "lucide-react";
+import { X, AlertTriangle, ExternalLink, Archive, Ban, TrendingDown, TrendingUp, PenLine } from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
 import { DecisionTracking } from "./decision-tracking";
@@ -255,6 +255,24 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange }: Props) 
 
           {!loading && decision && (
             <div className="px-5 py-5 space-y-5">
+              {/* Incomplete banner */}
+              {decision.incomplete && isActive && (
+                <div
+                  className="flex items-start gap-2 px-4 py-3 rounded-lg border"
+                  style={{ backgroundColor: "rgba(245,158,11,0.07)", borderColor: "rgba(245,158,11,0.3)" }}
+                >
+                  <PenLine size={15} className="shrink-0 mt-0.5" style={{ color: "var(--brand-warning)" }} />
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: "var(--brand-warning)" }}>
+                      此决策卡尚未补全
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+                      请在下方补填情绪评分、决策依据和止损价格，让数据更真实
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Status banners */}
               {isVoided && (
                 <div

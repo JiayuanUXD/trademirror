@@ -105,11 +105,20 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
     if (rows.length === 0) return;
     setIsSubmitting(true);
     try {
+      // Client-side pre-validation: filter out rows with invalid stock codes
+      const validRows = rows.filter((r) => /^\d{6}$/.test(r.stockCode));
+      const skipped = rows.length - validRows.length;
+      if (validRows.length === 0) {
+        setProcessError("所有记录的股票代码无效（需为 6 位数字），请手动修正后重试");
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await fetch("/api/decisions/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          trades: rows.map((r) => ({
+          trades: validRows.map((r) => ({
             stockCode: r.stockCode,
             stockName: r.stockName,
             stockMarket: inferMarket(r.stockCode),
@@ -121,12 +130,26 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
         }),
       });
 
-      const data = await res.json() as { created: unknown[]; failed: unknown[] };
-      setCreatedCount(data.created?.length ?? 0);
+      if (!res.ok) {
+        const errData = await res.json() as { error?: string | Record<string, unknown> };
+        const msg = typeof errData.error === "string"
+          ? errData.error
+          : "创建失败，请检查数据后重试";
+        setProcessError(msg);
+        return;
+      }
+
+      const data = await res.json() as { created: unknown[]; failed: { index: number; reason: string }[] };
+      const created = data.created?.length ?? 0;
+      if (created === 0 && (data.failed?.length ?? 0) > 0) {
+        setProcessError(`创建失败：${data.failed[0]?.reason ?? "未知错误"}`);
+        return;
+      }
+      setCreatedCount(created);
       setStep("done");
       router.refresh();
     } catch {
-      setProcessError("提交失败，请重试");
+      setProcessError("网络错误，请重试");
     } finally {
       setIsSubmitting(false);
     }
@@ -316,6 +339,21 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
                 </div>
               )}
 
+              {/* Submit error — shown here in confirm step */}
+              {processError && (
+                <div
+                  className="flex items-start gap-2 px-4 py-3 rounded-lg text-sm"
+                  style={{
+                    backgroundColor: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                    color: "var(--brand-red)",
+                  }}
+                >
+                  <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+                  {processError}
+                </div>
+              )}
+
               {rows.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -325,7 +363,7 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                    点击各字段可直接编辑；橙色高亮表示识别置信度较低，请重点核查。
+                    点击各字段可直接编辑；橙色高亮表示置信度低或股票代码不完整，请重点核查。
                   </p>
                   <div className="space-y-2">
                     {rows.map((row) => (
@@ -419,7 +457,14 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
                   className="flex-1 h-10 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-40"
                   style={{ backgroundColor: "var(--brand-blue)" }}
                 >
-                  {isSubmitting ? "创建中…" : `确认创建 ${rows.length} 张决策卡`}
+                  {isSubmitting
+                    ? "创建中…"
+                    : (() => {
+                        const valid = rows.filter((r) => /^\d{6}$/.test(r.stockCode)).length;
+                        return valid === rows.length
+                          ? `确认创建 ${rows.length} 张决策卡`
+                          : `创建 ${valid} 张（跳过 ${rows.length - valid} 条无效）`;
+                      })()}
                 </button>
               </>
             )}
@@ -442,6 +487,8 @@ function ConfirmRow({
   onDelete: () => void;
 }) {
   const lowConfidence = row.confidence < 0.7;
+  const invalidCode = !/^\d{6}$/.test(row.stockCode);
+  const needsAttention = lowConfidence || invalidCode;
   const isBuy = row.action === "BUY" || row.action === "ADD";
   const actionColor = isBuy ? "var(--color-up)" : "var(--color-down)";
 
@@ -450,10 +497,20 @@ function ConfirmRow({
       className="rounded-xl border p-3 space-y-2.5"
       style={{
         backgroundColor: "var(--surface-card)",
-        borderColor: lowConfidence ? "rgba(245,158,11,0.4)" : "var(--border-subtle)",
+        borderColor: invalidCode
+          ? "rgba(239,68,68,0.4)"
+          : needsAttention
+          ? "rgba(245,158,11,0.4)"
+          : "var(--border-subtle)",
       }}
     >
-      {lowConfidence && (
+      {invalidCode && (
+        <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--brand-red)" }}>
+          <AlertTriangle size={11} />
+          股票代码未识别，请手动填写 6 位数字代码
+        </div>
+      )}
+      {!invalidCode && lowConfidence && (
         <div className="flex items-center gap-1.5 text-[11px]" style={{ color: "var(--brand-warning)" }}>
           <AlertTriangle size={11} />
           识别置信度较低（{Math.round(row.confidence * 100)}%），请仔细核查
@@ -467,13 +524,13 @@ function ConfirmRow({
           className="w-20 h-8 px-2 rounded-md text-xs font-mono border text-center"
           style={{
             backgroundColor: "var(--surface-overlay)",
-            borderColor: "var(--border-subtle)",
-            color: "var(--brand-blue)",
+            borderColor: invalidCode ? "var(--brand-red)" : "var(--border-subtle)",
+            color: invalidCode ? "var(--brand-red)" : "var(--brand-blue)",
           }}
           value={row.stockCode}
           maxLength={6}
           onChange={(e) => onChange({ stockCode: e.target.value })}
-          placeholder="代码"
+          placeholder="000000"
         />
 
         {/* Stock name */}

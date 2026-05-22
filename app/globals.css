@@ -62,7 +62,7 @@
   --color-down: var(--brand-green); /* 跌、亏损、卖出 */
 
   /* Surfaces */
-  --surface-base: #0B0F15;
+  --surface-base: #0F172A;
   --surface-sidebar: #0F1520;
   --surface-card: #141B28;
   --surface-card-hover: #1A2335;
@@ -74,7 +74,7 @@
   --border-strong: rgba(255, 255, 255, 0.18);
 
   /* shadcn tokens — dark mode by default */
-  --background: #0B0F15;
+  --background: #0F172A;
   --foreground: #F1F5F9;
   --card: #141B28;
   --card-foreground: #F1F5F9;
@@ -122,8 +122,7 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: "Inter", -apple-system, "PingFang SC", "Hiragino Sans GB",
-      "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    /* Font family is now handled by next/font via CSS variables in layout.tsx */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: "kern" 1, "liga" 1;
@@ -221,4 +220,18 @@
 }
 .page-enter {
   animation: page-enter 0.18s ease-out both;
+}
+
+/* ── UI Pro Max Staggered entry ───────────────────────────────────────── */
+.stagger-1 { animation: page-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.stagger-2 { animation: page-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.10s both; }
+.stagger-3 { animation: page-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.stagger-4 { animation: page-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both; }
+
+/* ── UI Pro Max Glass Panel ───────────────────────────────────────────── */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }

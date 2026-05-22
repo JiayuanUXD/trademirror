@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lightbulb, CheckCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { StockCombobox, StockItem } from "@/components/shared/stock-combobox";
 import { StepIndicator } from "./step-indicator";
 import { ScorePicker } from "./score-picker";
@@ -55,6 +56,7 @@ export function DecisionForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
+  const [direction, setDirection] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<DangerAlert[] | null>(null);
@@ -262,8 +264,36 @@ export function DecisionForm() {
     clearError("basis");
   }
 
+  const isDangerGlow = step === 1 && (s2.fomoScore >= 7 || s2.calmScore <= 4);
+
+  const variants = {
+    enter: (direction: number) => ({
+      x: direction > 0 ? 30 : -30,
+      opacity: 0,
+      filter: "blur(4px)",
+    }),
+    center: {
+      zIndex: 1,
+      x: 0,
+      opacity: 1,
+      filter: "blur(0px)",
+    },
+    exit: (direction: number) => ({
+      zIndex: 0,
+      x: direction < 0 ? 30 : -30,
+      opacity: 0,
+      filter: "blur(4px)",
+    }),
+  };
+
   return (
-    <div className="space-y-6">
+    <div 
+      className={`space-y-6 transition-all duration-700 rounded-xl p-4 sm:p-6 ${
+        isDangerGlow 
+          ? "shadow-[0_0_40px_rgba(239,68,68,0.25)] ring-1 ring-red-500/40 bg-[#141B28]/90 backdrop-blur-xl" 
+          : "glass-panel"
+      }`}
+    >
       {/* 观察清单提示 banner */}
       {watchlistBanner && (
         <div
@@ -289,8 +319,20 @@ export function DecisionForm() {
         <StepIndicator steps={STEP_LABELS} current={step} />
       </div>
 
-      {/* ── Step 1 ── */}
-      {step === 0 && (
+      <div className="relative overflow-hidden min-h-[400px]">
+        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+          <motion.div
+            key={step}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className="w-full"
+          >
+            {/* ── Step 1 ── */}
+            {step === 0 && (
         <div className="space-y-4">
           {/* Stock search */}
           <div className="space-y-1">
@@ -348,6 +390,7 @@ export function DecisionForm() {
             </label>
             <input
               type="datetime-local"
+              autoComplete="off"
               className="w-full h-9 px-3 rounded-md text-sm border"
               style={{
                 backgroundColor: "var(--surface-overlay)",
@@ -403,6 +446,7 @@ export function DecisionForm() {
                 type="number"
                 min="0"
                 step="0.01"
+                autoComplete="off"
                 className="w-full h-9 px-3 rounded-md text-sm border"
                 style={{
                   backgroundColor: "var(--surface-overlay)",
@@ -429,6 +473,7 @@ export function DecisionForm() {
                 type="number"
                 min="100"
                 step="100"
+                autoComplete="off"
                 className="w-full h-9 px-3 rounded-md text-sm border"
                 style={{
                   backgroundColor: "var(--surface-overlay)",
@@ -472,6 +517,7 @@ export function DecisionForm() {
               </span>
             </div>
             <input
+              autoComplete="off"
               className="w-full h-9 px-3 rounded-md text-sm border"
               style={{
                 backgroundColor: "var(--surface-overlay)",
@@ -624,6 +670,7 @@ export function DecisionForm() {
                     min="0.1"
                     max="50"
                     step="0.5"
+                    autoComplete="off"
                     className="w-full h-9 px-3 pr-8 rounded-md text-sm border"
                     style={{
                       backgroundColor: "var(--surface-overlay)",
@@ -665,6 +712,7 @@ export function DecisionForm() {
                 type="number"
                 min="0"
                 step="0.01"
+                autoComplete="off"
                 className="w-full h-9 px-3 rounded-md text-sm border"
                 style={{
                   backgroundColor: "var(--surface-overlay)",
@@ -742,13 +790,19 @@ export function DecisionForm() {
           )}
         </div>
       )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {/* Navigation buttons */}
       <div className="flex gap-3 pt-2">
         {step > 0 && (
           <button
             type="button"
-            onClick={() => setStep((s) => s - 1)}
+            onClick={() => {
+              setDirection(-1);
+              setStep((s) => s - 1);
+            }}
             className="flex-1 h-10 rounded-lg text-sm font-medium transition-colors"
             style={{
               backgroundColor: "var(--surface-overlay)",
@@ -765,7 +819,10 @@ export function DecisionForm() {
             type="button"
             onClick={() => {
               const ok = step === 0 ? validateStep1() : validateStep2();
-              if (ok) setStep((s) => s + 1);
+              if (ok) {
+                setDirection(1);
+                setStep((s) => s + 1);
+              }
             }}
             className="flex-1 h-10 rounded-lg text-sm font-medium text-white transition-colors"
             style={{ backgroundColor: "var(--brand-blue)" }}

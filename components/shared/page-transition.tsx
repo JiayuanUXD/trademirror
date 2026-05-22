@@ -10,7 +10,15 @@ import { usePathname } from "next/navigation";
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <div key={pathname} className="page-enter h-full">
+    <div
+      key={pathname}
+      className="page-enter h-full"
+      onAnimationEnd={(e) => {
+        // Remove transform after animation so descendants can use position:fixed
+        // relative to the viewport (transform creates a new containing block).
+        (e.currentTarget as HTMLDivElement).style.transform = "none";
+      }}
+    >
       {children}
     </div>
   );

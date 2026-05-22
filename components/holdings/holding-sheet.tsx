@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { Holding } from "@/types/holding";
@@ -62,14 +63,16 @@ export function HoldingSheet({ open, mode, onClose, onCreated }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Body scroll lock
+  // Lock the main scroll container when sheet is open
   useEffect(() => {
+    const el = document.getElementById("main-scroll");
+    if (!el) return;
     if (open) {
-      document.body.style.overflow = "hidden";
+      el.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "";
+      el.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => { el.style.overflow = ""; };
   }, [open]);
 
   const handleCreated = useCallback((holding: Holding) => {
@@ -210,7 +213,7 @@ export function HoldingSheet({ open, mode, onClose, onCreated }: Props) {
     </div>
   );
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -230,6 +233,7 @@ export function HoldingSheet({ open, mode, onClose, onCreated }: Props) {
         {sheetHeader}
         {sheetBody}
       </div>
-    </>
+    </>,
+    document.body
   );
 }

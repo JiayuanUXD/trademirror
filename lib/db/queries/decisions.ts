@@ -179,7 +179,9 @@ export async function batchCreateDecisions(
         dangerSignals: "[]",
         status: "ACTIVE" as const,
         incomplete: 1,
-        createdAt: item.tradedAt ?? now,
+        // Always use current time so batch imports surface at the top of the list,
+        // regardless of the historical trade date in the screenshot.
+        createdAt: now,
         userId,
       };
       await db.insert(decisions).values(row);

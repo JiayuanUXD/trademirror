@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { ProxyAgent, fetch as undiciFetch } from "undici";
 
-function makeDispatcher() {
+function makeProxyFetch(): ((url: string, init: RequestInit) => Promise<Response>) | null {
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
-  return proxy ? new ProxyAgent(proxy) : undefined;
+  if (!proxy) return null;
+  // Only pull in undici when a proxy is actually configured
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { ProxyAgent, fetch: undiciFetch } = require("undici") as typeof import("undici");
+  const dispatcher = new ProxyAgent(proxy);
+  return (url: string, init: RequestInit) =>
+    undiciFetch(url, { ...init, dispatcher } as Parameters<typeof undiciFetch>[1]) as unknown as Promise<Response>;
 }
 
 export type RecognizedTrade = {
@@ -45,6 +50,8 @@ const SYSTEM_PROMPT = `你是一个 A 股交易记录解析助手。
 
 type Provider = "openai" | "gemini" | "deepseek";
 
+type ApiFetch = (url: string, init: RequestInit) => Promise<Response>;
+
 async function callVisionAPI(
   provider: Provider,
   apiKey: string,
@@ -52,11 +59,11 @@ async function callVisionAPI(
   model: string,
   mimeType: string,
   base64: string,
-  dispatcher: ReturnType<typeof makeDispatcher>
+  apiFetch: ApiFetch
 ): Promise<string> {
   if (provider === "gemini") {
     const url = `${apiUrl}/${model}:generateContent?key=${apiKey}`;
-    const res = await undiciFetch(url, {
+    const res = await apiFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -70,8 +77,7 @@ async function callVisionAPI(
         ],
         generationConfig: { maxOutputTokens: 8192 },
       }),
-      dispatcher,
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(55_000),
     });
     if (!res.ok) {
       const errText = await res.text();
@@ -87,7 +93,7 @@ async function callVisionAPI(
   }
 
   // OpenAI-compatible (openai + deepseek)
-  const res = await undiciFetch(apiUrl, {
+  const res = await apiFetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -109,8 +115,7 @@ async function callVisionAPI(
         },
       ],
     }),
-    dispatcher,
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(55_000),
   });
   if (!res.ok) {
     const errText = await res.text();
@@ -183,7 +188,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const allTrades: RecognizedTrade[] = [];
   const errors: { imageIndex: number; reason: string }[] = [];
-  const dispatcher = makeDispatcher();
+  // Use proxy-aware fetch only when HTTPS_PROXY is configured; otherwise use native fetch
+  const proxyFetch = makeProxyFetch();
+  const apiFetch: ApiFetch = proxyFetch ?? ((url, init) => fetch(url, init));
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -202,7 +209,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       let raw: string;
       try {
-        raw = await callVisionAPI(provider, apiKey, apiUrl, model, file.type, base64, dispatcher);
+        raw = await callVisionAPI(provider, apiKey, apiUrl, model, file.type, base64, apiFetch);
       } catch (err) {
         errors.push({
           imageIndex: i,

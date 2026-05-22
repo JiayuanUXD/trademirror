@@ -48,11 +48,12 @@ export function ScorePicker({
                 key={n}
                 type="button"
                 onClick={() => onChange(n)}
-                className="flex-1 h-8 rounded text-xs font-medium transition-all"
+                className="flex-1 h-8 rounded text-xs font-medium transition-all active:scale-[0.85] hover:scale-105"
                 style={{
                   backgroundColor: isSelected ? color : "var(--surface-overlay)",
                   color: isSelected ? "#fff" : "var(--muted-foreground)",
                   border: `1px solid ${isSelected ? color : "var(--border-subtle)"}`,
+                  boxShadow: isSelected ? `0 0 12px ${color}40` : "none"
                 }}
               >
                 {n}

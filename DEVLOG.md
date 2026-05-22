@@ -9,63 +9,57 @@
 
 ---
 
-## 2026-05-18
+## 2026-05-22
 
-### 决策卡查看体验优化
-- **右侧抽屉查看**：决策卡列表页（`/decisions`）由"点击卡片跳转详情页"改为"点击卡片弹出右侧 Sheet 抽屉"，无需离开列表即可浏览完整信息
-  - 新建 `components/decisions/decisions-list.tsx`：抽取列表渲染逻辑为 Client Component，持有 `selectedId` 状态
-  - 新建 `components/decisions/decision-sheet.tsx`：右侧 Sheet 面板，并行拉取 `/api/decisions/[id]`、`/api/decisions/[id]/errors`、`/api/errors`，渲染决策详情、情绪评分、价格跟踪（DecisionTracking）、错误标记（ErrorTagger）
-  - Sheet 行为：ESC 关闭、点击遮罩关闭、锁定 body 滚动；顶部"独立页面"按钮保留原有 `/decisions/[id]` 跳转
-  - `app/(main)/decisions/page.tsx` 简化为纯 Server Component，数据获取后直接传入 `<DecisionsList>`
+### 决策表单自动填充修复
 
-### 决策表单止损输入改版
-- **按比例 / 按价格切换**（`components/decisions/decision-form.tsx` Step 3）
-  - 新增 `stopLossMode`（`"pct" | "price"`）和 `stopLossPercent` 本地状态，默认"按比例"
-  - 按比例模式：输入跌幅百分比（如 `8`），自动计算对应止损价 `= 入场价 × (1 - pct%)`，下方实时显示"对应止损价：¥xxx"
-  - 按价格模式：保留原有绝对价格输入框
-  - 两种模式最终提交字段不变（`stopLossPrice` 绝对价格）
-- **提交按钮居中修复**：`记录这笔决策` 按钮加 `flex items-center justify-center gap-1.5`，图标与文字不再偏左
+**问题**：打开新建/补全决策表单时，浏览器会自动带入上一次填写的历史值。
 
-### 周复盘门禁优化
-- `/decisions/new` 在上周复盘未完成（DRAFT 状态）时，展示两条路径：
-  - 主路径（蓝色）→ 直接完成上周复盘
-  - 次路径 → 进入 `?mode=backfill` 补录历史交易（显示橙色提示条，引导完成后回去复盘）
+**修复**
+- `components/decisions/decision-form.tsx`：为价格、数量、理由、止损（按比例/按价格）、交易时间等所有 `<input>` 加上 `autoComplete="off"`
+- `components/decisions/decision-sheet.tsx`：补全表单的理由、止损价格输入框同样加 `autoComplete="off"`；`decisionId` 变化时重置 `completeForm` state 及 `completeError`，防止上一张卡的数据残留
 
-### 管理员角色管理交互优化
-- 用户管理页角色变更改为"下拉选择 + 二次确认弹窗"，防止误操作
-- 确认弹窗显示用户名和新角色，不允许修改自己的角色（按钮置灰 + 提示）
+---
 
-### P0: 股票搜索稳定性修复
-- **AbortController 防抖**：`stock-combobox.tsx` 引入 AbortController，用户快速输入时取消过期请求，消除 race condition
-- **网络失败降级**：fetch 失败时不再静默失败，下拉面板显示"搜索暂时不可用，请手动输入"
-- **LRU 缓存**：缓存最近 10 条搜索结果，网络异常时尝试部分匹配缓存数据
-- **移动端优化**：`onBlur` 加 150ms 延迟 + `suppressBlur` ref，防止移动端下拉菜单过早关闭
+### 截图批量导入——多项 Bug 修复
 
-### P1-a: 非理性依据增加"熟人/群友推荐"
-- `types/decision.ts`：`IrrationalBasis` 类型和 `IRRATIONAL_BASIS` 数组新增一项
+#### Bug 1：识别失败"fetch failed"
 
-### P1-b: 决策卡操作链 + 作废机制
-- **数据模型变更**（`lib/db/schema.ts`）：
-  - `isArchived: boolean` → `status: text`（ACTIVE / VOIDED / ARCHIVED）
-  - 新增 `voidedReason`（nullable: INPUT_ERROR / DUPLICATE / NOT_MINE）
-  - 新增 `voidedAt`（nullable timestamp）
-  - 新增 `parentId`（nullable，自引用关联父卡）
-- **数据迁移**（`lib/db/migrate.ts`）：自动检测旧 `is_archived` 列，`is_archived=1` → `status='ARCHIVED'`
-- **作废 API**：`PATCH /api/decisions/[id]/void` — 30min 内可选原因，超时必选
-- **归档 API**：`PATCH /api/decisions/[id]/archive`
-- **决策列表增强**（`decisions-list.tsx`）：
-  - 状态筛选 Tab（全部/活跃/已作废/已归档）
-  - voided 卡灰色+删除线，archived 降低透明度
-- **Sheet 操作面板**（`decision-sheet.tsx`）：
-  - ACTIVE 买入卡：加仓/减仓/清仓/作废/归档 按钮组
-  - ACTIVE 卖出卡：作废/归档
-  - 作废确认弹窗：≤30min 一键确认，>30min 必选原因
-  - VOIDED/ARCHIVED 状态横幅
-- **操作链子卡**（`decision-form.tsx`）：读取 URL params（parentId/stockCode/stockName/stockMarket/action），点击"加仓/减仓/清仓"跳转表单并自动预填
+**根因**：`app/api/decisions/import-vision/route.ts` 强制使用 `undici.fetch` 调用 Vision API，在 Vercel Serverless 环境下存在 TLS/网络兼容性问题。
 
-### P2: 自动填入当前价格
-- **新增** `app/api/stocks/price/route.ts`：调用东方财富实时行情 API，以 fen 为单位返回，转换为元
-- **StockCombobox 联动**：选择股票后自动 fetch `/api/stocks/price?code=&market=`，填入价格输入框
+**修复**
+- 改为默认使用 Node.js 原生 `fetch`，仅在配置了 `HTTPS_PROXY` 时才动态 `require('undici')` 并使用 `ProxyAgent`
+- 超时时间从 30s 调整为 55s，给大图片识别更多余量
+
+#### Bug 2：创建成功后决策卡列表不显示
+
+**根因**：`batchCreateDecisions` 将 `createdAt` 设置为截图中的历史交易时间（如 2024 年）。`getDecisions` 按 `desc(createdAt)` 排序且有 `limit: 100` 限制，历史时间戳的记录被推到底部，超出 limit 后不可见。
+
+**修复**：`lib/db/queries/decisions.ts` → `batchCreateDecisions` 始终使用 `Date.now()` 作为 `createdAt`，确保批量导入的卡片在列表顶部出现。
+
+#### Bug 3：提交按钮"无反应"
+
+**根因**：`handleSubmit` 在 API 调用失败时只调用了 `setProcessError()`，但该错误提示只在 `"upload"` 步骤渲染，`"confirm"` 步骤没有错误展示区域，导致用户看不到任何反馈，按钮表现为"无反应"。
+
+**修复**（`components/decisions/import-vision-modal.tsx`）
+- 在 `confirm` 步骤 JSX 中添加错误提示 Banner，与 `upload` 步骤使用相同组件
+- `handleSubmit` 补充 `res.ok` 检查，API 失败时提前返回并展示错误，不再误进入 `"done"` 步骤
+- 提交前客户端预验证：过滤股票代码不符合 6 位数字格式的行，若全部无效则直接提示用户修正
+- `ConfirmRow` 组件：无效股票代码的行显示红色边框 + "股票代码未识别" 警告，`placeholder` 改为 `"000000"` 引导填写；提交按钮文字动态显示"创建 N 张（跳过 M 条无效）"
+
+---
+
+### 抽屉遮罩未覆盖全页——根因修复
+
+**问题**：打开决策卡抽屉时，遮罩层无法覆盖页面顶部区域，决策列表内容透出遮罩之上。
+
+**根因**：`NavigationProgress`（`z-[9999]`）、下拉菜单（`z-50`）、`PageTransition` 动画期间的 `transform` 等组件，均在 `body` 的 stacking context 中参与层叠排序。它们的 `z-index` 高于抽屉遮罩的 `z-40`，导致遮罩被压在应用内容之下。虽然遮罩通过 `createPortal` 渲染到 `document.body`，但在同一 stacking context 下仍会被高 z-index 的同级元素遮挡。
+
+**修复**：`app/(main)/layout.tsx` 外层 `div` 添加 Tailwind `isolate` class（`isolation: isolate`）。
+
+这一改动将应用所有内容封装进独立的 stacking context，使其整体在 `body` 中以 `z: auto` 参与层叠。`createPortal` 渲染的遮罩（`z-40`）在 `body` stacking context 中始终高于 `z: auto` 的应用容器，彻底解决遮罩覆盖问题，且与应用内部 z-index 的使用完全解耦。
+
+---
 
 ## 2026-05-19
 
@@ -209,6 +203,68 @@
   - 覆盖 12 个操作：`addReason` / `removeReason` / `toggleReasonFlag` / `addPrereq` / `togglePrereq` / `removePrereq` / `addPreset` / `addCustomExit` / `triggerExitCondition` / `removeExit`
   - 所有函数从 `async` 改为同步，输入框立即清空（不等服务器响应）
   - ID 已由客户端 `crypto.randomUUID()` 生成，新增条目同样可乐观插入
+
+----
+
+## 2026-05-18
+
+### 决策卡查看体验优化
+- **右侧抽屉查看**：决策卡列表页（`/decisions`）由"点击卡片跳转详情页"改为"点击卡片弹出右侧 Sheet 抽屉"，无需离开列表即可浏览完整信息
+  - 新建 `components/decisions/decisions-list.tsx`：抽取列表渲染逻辑为 Client Component，持有 `selectedId` 状态
+  - 新建 `components/decisions/decision-sheet.tsx`：右侧 Sheet 面板，并行拉取 `/api/decisions/[id]`、`/api/decisions/[id]/errors`、`/api/errors`，渲染决策详情、情绪评分、价格跟踪（DecisionTracking）、错误标记（ErrorTagger）
+  - Sheet 行为：ESC 关闭、点击遮罩关闭、锁定 body 滚动；顶部"独立页面"按钮保留原有 `/decisions/[id]` 跳转
+  - `app/(main)/decisions/page.tsx` 简化为纯 Server Component，数据获取后直接传入 `<DecisionsList>`
+
+### 决策表单止损输入改版
+- **按比例 / 按价格切换**（`components/decisions/decision-form.tsx` Step 3）
+  - 新增 `stopLossMode`（`"pct" | "price"`）和 `stopLossPercent` 本地状态，默认"按比例"
+  - 按比例模式：输入跌幅百分比（如 `8`），自动计算对应止损价 `= 入场价 × (1 - pct%)`，下方实时显示"对应止损价：¥xxx"
+  - 按价格模式：保留原有绝对价格输入框
+  - 两种模式最终提交字段不变（`stopLossPrice` 绝对价格）
+- **提交按钮居中修复**：`记录这笔决策` 按钮加 `flex items-center justify-center gap-1.5`，图标与文字不再偏左
+
+### 周复盘门禁优化
+- `/decisions/new` 在上周复盘未完成（DRAFT 状态）时，展示两条路径：
+  - 主路径（蓝色）→ 直接完成上周复盘
+  - 次路径 → 进入 `?mode=backfill` 补录历史交易（显示橙色提示条，引导完成后回去复盘）
+
+### 管理员角色管理交互优化
+- 用户管理页角色变更改为"下拉选择 + 二次确认弹窗"，防止误操作
+- 确认弹窗显示用户名和新角色，不允许修改自己的角色（按钮置灰 + 提示）
+
+### P0: 股票搜索稳定性修复
+- **AbortController 防抖**：`stock-combobox.tsx` 引入 AbortController，用户快速输入时取消过期请求，消除 race condition
+- **网络失败降级**：fetch 失败时不再静默失败，下拉面板显示"搜索暂时不可用，请手动输入"
+- **LRU 缓存**：缓存最近 10 条搜索结果，网络异常时尝试部分匹配缓存数据
+- **移动端优化**：`onBlur` 加 150ms 延迟 + `suppressBlur` ref，防止移动端下拉菜单过早关闭
+
+### P1-a: 非理性依据增加"熟人/群友推荐"
+- `types/decision.ts`：`IrrationalBasis` 类型和 `IRRATIONAL_BASIS` 数组新增一项
+
+### P1-b: 决策卡操作链 + 作废机制
+- **数据模型变更**（`lib/db/schema.ts`）：
+  - `isArchived: boolean` → `status: text`（ACTIVE / VOIDED / ARCHIVED）
+  - 新增 `voidedReason`（nullable: INPUT_ERROR / DUPLICATE / NOT_MINE）
+  - 新增 `voidedAt`（nullable timestamp）
+  - 新增 `parentId`（nullable，自引用关联父卡）
+- **数据迁移**（`lib/db/migrate.ts`）：自动检测旧 `is_archived` 列，`is_archived=1` → `status='ARCHIVED'`
+- **作废 API**：`PATCH /api/decisions/[id]/void` — 30min 内可选原因，超时必选
+- **归档 API**：`PATCH /api/decisions/[id]/archive`
+- **决策列表增强**（`decisions-list.tsx`）：
+  - 状态筛选 Tab（全部/活跃/已作废/已归档）
+  - voided 卡灰色+删除线，archived 降低透明度
+- **Sheet 操作面板**（`decision-sheet.tsx`）：
+  - ACTIVE 买入卡：加仓/减仓/清仓/作废/归档 按钮组
+  - ACTIVE 卖出卡：作废/归档
+  - 作废确认弹窗：≤30min 一键确认，>30min 必选原因
+  - VOIDED/ARCHIVED 状态横幅
+- **操作链子卡**（`decision-form.tsx`）：读取 URL params（parentId/stockCode/stockName/stockMarket/action），点击"加仓/减仓/清仓"跳转表单并自动预填
+
+### P2: 自动填入当前价格
+- **新增** `app/api/stocks/price/route.ts`：调用东方财富实时行情 API，以 fen 为单位返回，转换为元
+- **StockCombobox 联动**：选择股票后自动 fetch `/api/stocks/price?code=&market=`，填入价格输入框
+
+
 
 ---
 

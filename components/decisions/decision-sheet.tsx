@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, AlertTriangle, ExternalLink, Archive, Ban, TrendingDown, TrendingUp, PenLine } from "lucide-react";
 import Link from "next/link";
 import dayjs from "dayjs";
@@ -125,8 +126,18 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
 
   useEffect(() => {
     if (!decisionId) return;
-    // Reset form expansion state for each new decision opened
+    // Reset both expansion state and form values for each new decision opened
     setShowCompleteForm(autoExpandComplete);
+    setCompleteForm({
+      reason: "",
+      basis: [],
+      systemAlignment: "ALIGN",
+      calmScore: 5,
+      confidenceScore: 5,
+      fomoScore: 3,
+      stopLossPrice: "",
+    });
+    setCompleteError("");
     const controller = new AbortController();
     fetchData(decisionId, controller.signal);
     return () => controller.abort();
@@ -140,11 +151,17 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose, variant]);
 
-  // Prevent body scroll when open (sheet mode only)
+  // Prevent main-scroll container from scrolling when sheet is open
   useEffect(() => {
     if (variant !== "sheet") return;
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    const el = document.getElementById("main-scroll");
+    if (!el) return;
+    if (open) {
+      el.style.overflow = "hidden";
+    } else {
+      el.style.overflow = "";
+    }
+    return () => { el.style.overflow = ""; };
   }, [open, variant]);
 
   async function handleVoid() {
@@ -324,6 +341,7 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
                           一句话理由 *
                         </label>
                         <input
+                          autoComplete="off"
                           className="w-full h-9 px-3 rounded-md text-sm border"
                           style={{ backgroundColor: "var(--surface-base)", borderColor: "var(--border-subtle)", color: "var(--foreground)" }}
                           placeholder="为什么做这笔交易？"
@@ -431,6 +449,7 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
                         </label>
                         <input
                           type="number"
+                          autoComplete="off"
                           className="w-full h-9 px-3 rounded-md text-sm border"
                           style={{ backgroundColor: "var(--surface-base)", borderColor: "var(--border-subtle)", color: "var(--foreground)" }}
                           placeholder={`建议 ¥${(decision.price * 0.92).toFixed(2)}`}
@@ -775,8 +794,8 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
     );
   }
 
-  /* ── Sheet mode (default): fixed overlay ─────────────────────────── */
-  return (
+  /* ── Sheet mode (default): portal → document.body, bypasses any CSS transform context ── */
+  return createPortal(
     <>
       <div
         className="fixed inset-0 z-40"
@@ -798,7 +817,8 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
         {sharedHeader}
         {sharedBody}
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 

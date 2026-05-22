@@ -16,12 +16,12 @@ export default async function MainLayout({
   const role = (session?.user?.role ?? "user") as "admin" | "user";
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col isolate">
       <NavigationProgress />
       <Navbar user={user} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar role={role} />
-        <main className="flex-1 overflow-y-auto">
+        <main id="main-scroll" className="flex-1 overflow-y-auto">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

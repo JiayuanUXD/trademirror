@@ -466,7 +466,7 @@ export function HoldingDetailTabs({ holding: initial, decisions }: Props) {
                   </div>
                 </div>
                 <span className="text-[11px] shrink-0" style={{ color: "var(--muted-foreground)" }}>
-                  {dayjs(d.createdAt).format("MM/DD")}
+                  {dayjs(d.tradedAt ?? d.createdAt).format("MM/DD")}
                 </span>
               </div>
             );

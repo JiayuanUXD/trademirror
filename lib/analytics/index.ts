@@ -101,7 +101,7 @@ export function getActionBreakdown(decisions: Decision[]): ActionBreakdownItem[]
 export function getWeeklyTrend(decisions: Decision[]): WeeklyTrendItem[] {
   const byWeek: Record<string, { count: number; dangerCount: number }> = {};
   for (const d of decisions) {
-    const ws = getWeekStart(dayjs(d.createdAt));
+    const ws = getWeekStart(dayjs(d.tradedAt ?? d.createdAt));
     const key = ws.format("MM/DD");
     if (!byWeek[key]) byWeek[key] = { count: 0, dangerCount: 0 };
     byWeek[key].count++;

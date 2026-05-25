@@ -9,6 +9,59 @@
 
 ---
 
+## 2026-05-25
+
+### 卖出操作隐藏止损字段
+
+**问题**：SELL / REDUCE / CLEAR 操作不需要预设止损，但表单第三步仍要求填写。
+
+**修复**
+- `components/decisions/decision-form.tsx`：检测 `isSellAction`，卖出时隐藏止损输入区，显示提示"卖出操作无需预设止损，已自动跳过"；`stopLossPrice` 自动传 0
+- `lib/validators/decision.ts`：`stopLossPrice` 从 `.positive()` 改为 `.min(0)`，允许 0
+- `app/api/decisions/route.ts`：服务端检测卖出操作，`maxAcceptableLoss` 存 0
+
+---
+
+### 批量导入时间字段分离（tradedAt）
+
+**问题**：批量导入的决策卡显示的是导入时间而非截图中的实际交易时间。
+
+**根因**：表里只有 `created_at` 一个时间字段。之前为修复"批量导入后列表不显示"，将 `createdAt` 改为 `Date.now()`，导致实际交易时间丢失。
+
+**修复**
+- `lib/db/schema.ts` / `lib/db/migrate.ts`：新增 `traded_at INTEGER` 列（nullable），并加 ALTER TABLE 迁移
+- `types/decision.ts`：Decision 类型加 `tradedAt: number | null`
+- `lib/db/queries/decisions.ts`：`rowToDecision` 读取 `tradedAt`；`batchCreateDecisions` 写入 `tradedAt = item.tradedAt ?? null`，`createdAt` 保持 `Date.now()`（确保排序）
+- `app/api/decisions/route.ts`：普通表单提交也将 `tradedAt` 与 `createdAt` 分开存储
+- UI（decisions-list、decision-sheet、calendar、reviews、dashboard、holdings、decisions 详情页）：展示时统一用 `tradedAt ?? createdAt`
+- DB 查询层（reviews、portraits、danger-stats、analytics）：过滤改用 `COALESCE(traded_at, created_at)` 确保周/月归属以实际交易时间为准
+
+---
+
+### 复盘拦截与复盘页面逻辑修复
+
+**问题 1**：新建决策卡时提示"完成上周复盘"，但上周复盘已完成。
+
+**根因**：`lib/week.ts` 中 `getWeekStart` 使用 `startOf("day")`，依赖本地时区。本地（CST +8）的周一 00:00 = 上周日 16:00 UTC，与 Vercel（UTC）产生不同 timestamp，导致查询时找到了 CST-based DRAFT 复盘而非 UTC-based COMPLETED 复盘。
+
+**修复**：`lib/week.ts` 改用 `Date.UTC(year, month, date)`，无论运行在哪个时区都输出 UTC 零点，本地开发与生产环境结果一致。
+
+**问题 2**：复盘页面在本周进行中且无历史欠账时仍显示"本周复盘待完成"。
+
+**修复**：`app/(main)/reviews/page.tsx` 引入 `showPending` 逻辑——只有在「本周已结束」或「有历史未完成复盘」时才显示"待完成"提醒；否则显示"本周进行中"（低权重样式）。
+
+---
+
+### 历史复盘删除
+
+**新增**：复盘列表页历史复盘行加删除按钮，支持二次确认。
+
+- `lib/db/queries/reviews.ts`：新增 `deleteReview`，SQL 层强制 `weekStart < currentWeekStart`，不允许删除本周
+- `app/api/reviews/[id]/route.ts`：新增 `DELETE` handler
+- `components/reviews/delete-review-button.tsx`：客户端删除按钮组件，hover 显示，点击后展开确认/取消行内弹层
+
+---
+
 ## 2026-05-22
 
 ### 决策表单自动填充修复

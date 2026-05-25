@@ -13,6 +13,7 @@ function rowToDecision(row: typeof decisions.$inferSelect): Decision {
     voidedAt: row.voidedAt ?? null,
     parentId: row.parentId ?? null,
     incomplete: row.incomplete === 1,
+    tradedAt: row.tradedAt ?? null,
   };
 }
 
@@ -60,6 +61,7 @@ export type InsertDecision = Omit<
 > & {
   basis: DecisionBasis[];
   dangerSignals: DangerSignal[];
+  tradedAt?: number | null;
 };
 
 export async function updateDecision(
@@ -179,9 +181,10 @@ export async function batchCreateDecisions(
         dangerSignals: "[]",
         status: "ACTIVE" as const,
         incomplete: 1,
-        // Always use current time so batch imports surface at the top of the list,
-        // regardless of the historical trade date in the screenshot.
+        // createdAt = import time, so cards always surface at the top of the list.
+        // tradedAt = actual trade time from the screenshot (may be null if unrecognized).
         createdAt: now,
+        tradedAt: item.tradedAt ?? null,
         userId,
       };
       await db.insert(decisions).values(row);

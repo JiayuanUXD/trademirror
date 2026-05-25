@@ -110,9 +110,10 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
   let currentReview = await getReviewByWeekStart(weekStart, userId);
   if (!currentReview) currentReview = await createReview(weekStart, weekEnd, userId);
 
-  const weekDecisions = decisions.filter(
-    (d) => d.createdAt >= weekStart && d.createdAt <= weekEnd
-  );
+  const weekDecisions = decisions.filter((d) => {
+    const ts = d.tradedAt ?? d.createdAt;
+    return ts >= weekStart && ts <= weekEnd;
+  });
   const activeHoldings = holdings.filter((h) => h.status === "HOLDING").length;
   const dangerTotal = decisions.filter((d) => d.dangerSignals.length > 0).length;
   const reviewPending = currentReview.status === "DRAFT";
@@ -131,7 +132,7 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
 
   // Emotion baseline: avg FOMO from last 7 days
   const sevenDaysAgo = dayjs().subtract(7, "day").valueOf();
-  const recentDecisions = decisions.filter((d) => d.createdAt >= sevenDaysAgo);
+  const recentDecisions = decisions.filter((d) => (d.tradedAt ?? d.createdAt) >= sevenDaysAgo);
   const recentFomoAvg =
     recentDecisions.length > 0
       ? Math.round((recentDecisions.reduce((s, d) => s + d.fomoScore, 0) / recentDecisions.length) * 10) / 10
@@ -140,10 +141,10 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
   // Backfill reminders: decisions needing price follow-up
   const now = Date.now();
   const backfill7 = decisions.filter(
-    (d) => d.createdAt < now - 7 * 24 * 3600 * 1000 && d.priceAfter7Days == null
+    (d) => (d.tradedAt ?? d.createdAt) < now - 7 * 24 * 3600 * 1000 && d.priceAfter7Days == null
   ).slice(0, 3);
   const backfill30 = decisions.filter(
-    (d) => d.createdAt < now - 30 * 24 * 3600 * 1000 && d.priceAfter30Days == null
+    (d) => (d.tradedAt ?? d.createdAt) < now - 30 * 24 * 3600 * 1000 && d.priceAfter30Days == null
   ).slice(0, 2);
   const backfillItems = [...backfill30, ...backfill7.filter((d) => !backfill30.includes(d))].slice(0, 3);
 
@@ -377,7 +378,7 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
             {backfillItems.map((d) => {
               const isBuy = d.action === "BUY" || d.action === "ADD";
               const actionColor = isBuy ? "var(--color-up)" : "var(--color-down)";
-              const daysAgo = Math.floor((now - d.createdAt) / (24 * 3600 * 1000));
+              const daysAgo = Math.floor((now - (d.tradedAt ?? d.createdAt)) / (24 * 3600 * 1000));
               const needs7 = d.priceAfter7Days == null && daysAgo >= 7;
               const needs30 = d.priceAfter30Days == null && daysAgo >= 30;
               return (
@@ -417,7 +418,7 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
                     )}
                   </div>
                   <span className="text-[11px] shrink-0 tabular-nums" style={{ color: "var(--muted-foreground)" }}>
-                    {dayjs(d.createdAt).format("MM/DD")}
+                    {dayjs(d.tradedAt ?? d.createdAt).format("MM/DD")}
                   </span>
                 </Link>
               );
@@ -487,7 +488,7 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
                      <AlertTriangle size={12} className="shrink-0" style={{ color: "var(--brand-warning)" }} />
                   )}
                   <span className="text-[11px] shrink-0 tabular-nums" style={{ color: "var(--muted-foreground)" }}>
-                    {dayjs(d.createdAt).format("MM/DD")}
+                    {dayjs(d.tradedAt ?? d.createdAt).format("MM/DD")}
                   </span>
                 </Link>
               );

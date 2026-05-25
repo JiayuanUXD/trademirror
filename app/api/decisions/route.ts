@@ -52,9 +52,11 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parsed.data;
+    const isSellAction = ["SELL", "REDUCE", "CLEAR"].includes(data.action);
     const amount = Math.round(data.price * data.quantity * 100) / 100;
-    const maxAcceptableLoss =
-      Math.round(Math.abs(data.price - data.stopLossPrice) * data.quantity * 100) / 100;
+    const maxAcceptableLoss = isSellAction
+      ? 0
+      : Math.round(Math.abs(data.price - data.stopLossPrice) * data.quantity * 100) / 100;
 
     const dangerSignals = calcDangerSignals({
       fomoScore: data.fomoScore,
@@ -84,7 +86,8 @@ export async function POST(req: NextRequest) {
       maxAcceptableLoss,
       dangerSignals,
       parentId: (rawBody.parentId as string) ?? null,
-      createdAt: data.tradedAt || Date.now(),
+      tradedAt: data.tradedAt ?? null,
+      createdAt: Date.now(),
     }, userId);
 
     return NextResponse.json(decision, { status: 201 });

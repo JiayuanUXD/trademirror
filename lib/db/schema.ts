@@ -175,6 +175,7 @@ export const decisions = sqliteTable("decisions", {
   voidedAt: integer("voided_at"),
   parentId: text("parent_id"),
   incomplete: integer("incomplete").notNull().default(0),
+  tradedAt: integer("traded_at"),
   createdAt: integer("created_at").notNull(),
   userId: text("user_id").notNull(),
 });

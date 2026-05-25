@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, lt, lte } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, lt, lte, sql } from "drizzle-orm";
 import dayjs from "dayjs";
 import { db } from "../index";
 import { decisions } from "../schema";
@@ -71,8 +71,8 @@ export async function getNotAlignThisMonth(userId: string): Promise<NotAlignStat
     .where(
       and(
         eq(decisions.systemAlignment, "NOT_ALIGN"),
-        gte(decisions.createdAt, monthStart),
-        lte(decisions.createdAt, monthEnd),
+        gte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, monthStart),
+        lte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, monthEnd),
         eq(decisions.status, "ACTIVE"),
         eq(decisions.userId, userId),
       )

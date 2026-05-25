@@ -549,7 +549,7 @@ function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onComplete, 
 
       {/* 日期 */}
       <td className="px-4 py-3 text-[11px] whitespace-nowrap" style={{ color: "var(--muted-foreground)" }}>
-        {dayjs(d.createdAt).format("MM/DD HH:mm")}
+        {dayjs(d.tradedAt ?? d.createdAt).format("MM/DD HH:mm")}
       </td>
 
       {/* 操作 */}
@@ -635,7 +635,7 @@ function DecisionCard({ d, onSelect, onComplete, onActionDone }: { d: Decision }
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             <span style={{ fontSize: "11px", color: "var(--muted-foreground)" }}>
-              {dayjs(d.createdAt).format("MM/DD HH:mm")}
+              {dayjs(d.tradedAt ?? d.createdAt).format("MM/DD HH:mm")}
             </span>
             {hasResult && !isVoided && (
               <span className="text-xs font-bold tabular-nums"

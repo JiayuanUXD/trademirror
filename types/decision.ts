@@ -102,6 +102,7 @@ export type Decision = {
   voidedAt: number | null;
   parentId: string | null;
   incomplete: boolean;
+  tradedAt: number | null;
   createdAt: number;
 };
 

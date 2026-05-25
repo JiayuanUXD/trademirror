@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, lt } from "drizzle-orm";
 import { db } from "../index";
 import { weeklyReviews, decisions } from "../schema";
 import type { WeeklyReview, DisciplineItem, DisciplineScore } from "@/types/review";
@@ -34,8 +34,8 @@ async function attachStats(
       })
       .from(decisions)
       .where(and(
-        gte(decisions.createdAt, row.weekStart),
-        lte(decisions.createdAt, row.weekEnd),
+        gte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, row.weekStart),
+        lte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, row.weekEnd),
         eq(decisions.userId, userId),
       ));
 
@@ -96,8 +96,8 @@ export async function createReview(
     .select({ id: decisions.id })
     .from(decisions)
     .where(and(
-      gte(decisions.createdAt, weekStart),
-      lte(decisions.createdAt, weekEnd),
+      gte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, weekStart),
+      lte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, weekEnd),
       eq(decisions.userId, userId),
     ));
 
@@ -154,4 +154,21 @@ export async function updateReview(
   const updated = await getReviewById(id, userId);
   if (!updated) throw new Error("Review not found");
   return updated;
+}
+
+/** 删除一条历史复盘（只允许删除非本周的复盘） */
+export async function deleteReview(
+  id: string,
+  userId: string,
+  currentWeekStart: number
+): Promise<void> {
+  await db
+    .delete(weeklyReviews)
+    .where(
+      and(
+        eq(weeklyReviews.id, id),
+        eq(weeklyReviews.userId, userId),
+        lt(weeklyReviews.weekStart, currentWeekStart) // 不允许删除本周
+      )
+    );
 }

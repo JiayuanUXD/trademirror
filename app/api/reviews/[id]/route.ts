@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { patchReviewSchema, completeReviewSchema } from "@/lib/validators/review";
-import { getReviewById, updateReview } from "@/lib/db/queries/reviews";
+import { getReviewById, updateReview, deleteReview } from "@/lib/db/queries/reviews";
+import { getWeekStart } from "@/lib/week";
+import dayjs from "dayjs";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -57,6 +59,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json(review);
   } catch (err) {
     console.error("[PATCH /api/reviews/[id]]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  try {
+    const { id } = await params;
+    const currentWeekStart = getWeekStart(dayjs()).valueOf();
+    await deleteReview(id, userId, currentWeekStart);
+    return new NextResponse(null, { status: 204 });
+  } catch (err) {
+    console.error("[DELETE /api/reviews/[id]]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -161,8 +161,10 @@ export function DecisionForm() {
   }
 
   async function attemptSubmit() {
+    // 卖出/减仓/清仓不需要止损，直接用 0
+    const stopLossPriceForValidation = isSellAction ? 0 : Number(s3.stopLossPrice);
     const result = step3Schema.safeParse({
-      stopLossPrice: Number(s3.stopLossPrice),
+      stopLossPrice: stopLossPriceForValidation,
       systemAlignment: s3.systemAlignment,
     });
     if (!result.success) {
@@ -222,7 +224,7 @@ export function DecisionForm() {
         calmScore: s2.calmScore,
         confidenceScore: s2.confidenceScore,
         fomoScore: s2.fomoScore,
-        stopLossPrice: Number(s3.stopLossPrice),
+        stopLossPrice: isSellAction ? 0 : Number(s3.stopLossPrice),
         systemAlignment: s3.systemAlignment,
       };
       if (parentId) payload.parentId = parentId;
@@ -247,6 +249,8 @@ export function DecisionForm() {
       setIsSubmitting(false);
     }
   }
+
+  const isSellAction = ["SELL", "REDUCE", "CLEAR"].includes(s1.action);
 
   const price = Number(s1.price) || 0;
   const quantity = Number(s1.quantity) || 0;
@@ -635,117 +639,132 @@ export function DecisionForm() {
       {/* ── Step 3 ── */}
       {step === 2 && (
         <div className="space-y-4">
-          {/* Stop loss */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-                预设止损
-              </label>
-              <div
-                className="flex rounded-md overflow-hidden text-[11px]"
-                style={{ border: "1px solid var(--border-subtle)" }}
-              >
-                {(["pct", "price"] as const).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setStopLossMode(m)}
-                    className="px-2.5 py-1 transition-colors"
-                    style={{
-                      backgroundColor: stopLossMode === m ? "var(--brand-blue)" : "var(--surface-overlay)",
-                      color: stopLossMode === m ? "#fff" : "var(--muted-foreground)",
-                    }}
+          {/* Stop loss — 买入/加仓才需要 */}
+          {!isSellAction ? (
+            <>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                    预设止损
+                  </label>
+                  <div
+                    className="flex rounded-md overflow-hidden text-[11px]"
+                    style={{ border: "1px solid var(--border-subtle)" }}
                   >
-                    {m === "pct" ? "按比例" : "按价格"}
-                  </button>
-                ))}
-              </div>
-            </div>
+                    {(["pct", "price"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setStopLossMode(m)}
+                        className="px-2.5 py-1 transition-colors"
+                        style={{
+                          backgroundColor: stopLossMode === m ? "var(--brand-blue)" : "var(--surface-overlay)",
+                          color: stopLossMode === m ? "#fff" : "var(--muted-foreground)",
+                        }}
+                      >
+                        {m === "pct" ? "按比例" : "按价格"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {stopLossMode === "pct" ? (
-              <div className="space-y-1">
-                <div className="relative">
+                {stopLossMode === "pct" ? (
+                  <div className="space-y-1">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0.1"
+                        max="50"
+                        step="0.5"
+                        autoComplete="off"
+                        className="w-full h-9 px-3 pr-8 rounded-md text-sm border"
+                        style={{
+                          backgroundColor: "var(--surface-overlay)",
+                          borderColor: errors.stopLossPrice ? "var(--brand-red)" : "var(--border-subtle)",
+                          color: "var(--foreground)",
+                        }}
+                        placeholder="8"
+                        value={stopLossPercent}
+                        onChange={(e) => {
+                          setStopLossPercent(e.target.value);
+                          const pct = parseFloat(e.target.value);
+                          const entryPrice = Number(s1.price);
+                          if (!isNaN(pct) && pct > 0 && entryPrice > 0) {
+                            setS3((p) => ({ ...p, stopLossPrice: (entryPrice * (1 - pct / 100)).toFixed(2) }));
+                          } else {
+                            setS3((p) => ({ ...p, stopLossPrice: "" }));
+                          }
+                          clearError("stopLossPrice");
+                        }}
+                      />
+                      <span
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none select-none"
+                        style={{ color: "var(--muted-foreground)" }}
+                      >
+                        %
+                      </span>
+                    </div>
+                    {s3.stopLossPrice && (
+                      <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+                        对应止损价：
+                        <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
+                          ¥{Number(s3.stopLossPrice).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                ) : (
                   <input
                     type="number"
-                    min="0.1"
-                    max="50"
-                    step="0.5"
+                    min="0"
+                    step="0.01"
                     autoComplete="off"
-                    className="w-full h-9 px-3 pr-8 rounded-md text-sm border"
+                    className="w-full h-9 px-3 rounded-md text-sm border"
                     style={{
                       backgroundColor: "var(--surface-overlay)",
                       borderColor: errors.stopLossPrice ? "var(--brand-red)" : "var(--border-subtle)",
                       color: "var(--foreground)",
                     }}
-                    placeholder="8"
-                    value={stopLossPercent}
+                    placeholder="1700.00"
+                    value={s3.stopLossPrice}
                     onChange={(e) => {
-                      setStopLossPercent(e.target.value);
-                      const pct = parseFloat(e.target.value);
-                      const entryPrice = Number(s1.price);
-                      if (!isNaN(pct) && pct > 0 && entryPrice > 0) {
-                        setS3((p) => ({ ...p, stopLossPrice: (entryPrice * (1 - pct / 100)).toFixed(2) }));
-                      } else {
-                        setS3((p) => ({ ...p, stopLossPrice: "" }));
-                      }
+                      setS3((p) => ({ ...p, stopLossPrice: e.target.value }));
                       clearError("stopLossPrice");
                     }}
                   />
-                  <span
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs pointer-events-none select-none"
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    %
-                  </span>
-                </div>
-                {s3.stopLossPrice && (
-                  <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
-                    对应止损价：
-                    <span style={{ color: "var(--foreground)", fontWeight: 500 }}>
-                      ¥{Number(s3.stopLossPrice).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}
-                    </span>
-                  </p>
+                )}
+
+                {errors.stopLossPrice && (
+                  <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stopLossPrice}</p>
                 )}
               </div>
-            ) : (
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                autoComplete="off"
-                className="w-full h-9 px-3 rounded-md text-sm border"
-                style={{
-                  backgroundColor: "var(--surface-overlay)",
-                  borderColor: errors.stopLossPrice ? "var(--brand-red)" : "var(--border-subtle)",
-                  color: "var(--foreground)",
-                }}
-                placeholder="1700.00"
-                value={s3.stopLossPrice}
-                onChange={(e) => {
-                  setS3((p) => ({ ...p, stopLossPrice: e.target.value }));
-                  clearError("stopLossPrice");
-                }}
-              />
-            )}
 
-            {errors.stopLossPrice && (
-              <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>{errors.stopLossPrice}</p>
-            )}
-          </div>
-
-          {/* Max loss preview */}
-          {maxLoss > 0 && (
+              {/* Max loss preview */}
+              {maxLoss > 0 && (
+                <div
+                  className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
+                  style={{
+                    backgroundColor: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                  }}
+                >
+                  <span style={{ color: "var(--muted-foreground)" }}>最大可接受亏损</span>
+                  <span style={{ color: "var(--brand-red)", fontWeight: 600 }}>
+                    -¥{maxLoss.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
             <div
-              className="flex items-center justify-between rounded-md px-3 py-2 text-sm"
+              className="rounded-lg px-4 py-3 text-sm"
               style={{
-                backgroundColor: "rgba(239,68,68,0.08)",
-                border: "1px solid rgba(239,68,68,0.2)",
+                backgroundColor: "rgba(148,163,184,0.08)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--muted-foreground)",
               }}
             >
-              <span style={{ color: "var(--muted-foreground)" }}>最大可接受亏损</span>
-              <span style={{ color: "var(--brand-red)", fontWeight: 600 }}>
-                -¥{maxLoss.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}
-              </span>
+              卖出操作无需预设止损，已自动跳过。
             </div>
           )}
 

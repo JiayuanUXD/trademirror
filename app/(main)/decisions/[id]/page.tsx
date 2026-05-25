@@ -90,7 +90,7 @@ export default async function DecisionDetailPage({ params }: Props) {
             </span>
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
-            {dayjs(decision.createdAt).format("YYYY年MM月DD日 HH:mm")}
+            {dayjs(decision.tradedAt ?? decision.createdAt).format("YYYY年MM月DD日 HH:mm")}
           </p>
         </div>
       </div>

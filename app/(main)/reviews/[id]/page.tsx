@@ -26,9 +26,10 @@ export default async function ReviewDetailPage({ params }: Props) {
   ]);
   if (!review) notFound();
 
-  const weekDecisions = allDecisions.filter(
-    (d) => d.createdAt >= review.weekStart && d.createdAt <= review.weekEnd
-  );
+  const weekDecisions = allDecisions.filter((d) => {
+    const ts = d.tradedAt ?? d.createdAt;
+    return ts >= review.weekStart && ts <= review.weekEnd;
+  });
 
   return (
     <div className="px-4 py-6 space-y-6">
@@ -92,7 +93,7 @@ export default async function ReviewDetailPage({ params }: Props) {
                   <p className="text-xs truncate mt-0.5" style={{ color: "var(--muted-foreground)" }}>{d.reason}</p>
                 </div>
                 <span className="text-[11px] shrink-0" style={{ color: "var(--muted-foreground)" }}>
-                  {dayjs(d.createdAt).format("MM/DD")}
+                  {dayjs(d.tradedAt ?? d.createdAt).format("MM/DD")}
                 </span>
               </div>
             );

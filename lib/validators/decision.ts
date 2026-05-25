@@ -55,7 +55,7 @@ export const step2Schema = z.object({
 export const step3Schema = z.object({
   stopLossPrice: z
     .number({ error: "请填写止损价" })
-    .positive("止损价必须大于0"),
+    .min(0, "止损价不能为负数"),
   systemAlignment: z.enum(["ALIGN", "PARTIAL", "NOT_ALIGN"], {
     error: "请选择符合度",
   }),

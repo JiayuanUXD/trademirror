@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { db } from "../index";
 import { monthlyPortraits, decisions, weeklyReviews } from "../schema";
 import type { MonthlyPortrait, ProblemEvalItem, ProblemId } from "@/types/portrait";
@@ -22,8 +22,8 @@ async function attachStats(
     .select()
     .from(decisions)
     .where(and(
-      gte(decisions.createdAt, start),
-      lte(decisions.createdAt, end),
+      gte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, start),
+      lte(sql`COALESCE(${decisions.tradedAt}, ${decisions.createdAt})`, end),
       eq(decisions.userId, userId),
     ));
 

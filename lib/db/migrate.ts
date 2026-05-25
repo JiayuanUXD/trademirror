@@ -118,6 +118,7 @@ const CREATE_TABLES = [
     voided_at INTEGER,
     parent_id TEXT,
     incomplete INTEGER NOT NULL DEFAULT 0,
+    traded_at INTEGER,
     created_at INTEGER NOT NULL,
     user_id TEXT NOT NULL
   )`,
@@ -200,6 +201,7 @@ const ALTER_TABLES: { table: string; column: string; def: string }[] = [
   { table: "decisions", column: "voided_at", def: "INTEGER" },
   { table: "decisions", column: "parent_id", def: "TEXT" },
   { table: "decisions", column: "incomplete", def: "INTEGER NOT NULL DEFAULT 0" },
+  { table: "decisions", column: "traded_at", def: "INTEGER" },
 ];
 
 // ─── Preset Error Types ─────────────────────────────────────────────────────

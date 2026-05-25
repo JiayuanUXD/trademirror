@@ -11,6 +11,7 @@ type Decision = {
   stockCode: string;
   action: "BUY" | "ADD" | "SELL" | "REDUCE" | "CLEAR";
   price: number;
+  tradedAt: number | null;
   createdAt: number;
   fomoScore: number;
   dangerSignals: string;
@@ -85,7 +86,7 @@ export default function CalendarPage() {
   for (let i = 1; i <= daysInMonth; i++) days.push(currentDate.date(i));
 
   function getDecisionsForDay(date: dayjs.Dayjs) {
-    return decisions.filter((d) => dayjs(d.createdAt).isSame(date, "day"));
+    return decisions.filter((d) => dayjs(d.tradedAt ?? d.createdAt).isSame(date, "day"));
   }
 
   const panelOpen = selectedId !== null;

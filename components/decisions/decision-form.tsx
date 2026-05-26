@@ -62,6 +62,17 @@ export function DecisionForm() {
   const [pendingAlerts, setPendingAlerts] = useState<DangerAlert[] | null>(null);
   const [watchlistBanner, setWatchlistBanner] = useState(false);
   const [parentId, setParentId] = useState<string | null>(null);
+  const [recentStocks, setRecentStocks] = useState<Array<{ stockCode: string; stockName: string; stockMarket: "SH" | "SZ" | "BJ" }>>([]);
+
+  // Fetch recent stocks for quick-fill
+  useEffect(() => {
+    fetch("/api/decisions/recent-stocks")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: unknown) => {
+        if (Array.isArray(data)) setRecentStocks(data as Array<{ stockCode: string; stockName: string; stockMarket: "SH" | "SZ" | "BJ" }>);
+      })
+      .catch(() => {});
+  }, []);
 
   // Pre-fill from URL params (child card)
   useEffect(() => {
@@ -338,6 +349,56 @@ export function DecisionForm() {
             {/* ── Step 1 ── */}
             {step === 0 && (
         <div className="space-y-4">
+          {/* Quick-pick for ADD / CLEAR: show recent stocks */}
+          {(s1.action === "ADD" || s1.action === "CLEAR") && recentStocks.length > 0 && !s1.stockCode && (
+            <div className="space-y-1.5">
+              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                从最近操作选择
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {recentStocks.map((stock) => (
+                  <button
+                    key={stock.stockCode}
+                    type="button"
+                    onClick={async () => {
+                      setS1((p) => ({
+                        ...p,
+                        stockCode: stock.stockCode,
+                        stockName: stock.stockName,
+                        stockMarket: stock.stockMarket,
+                      }));
+                      clearError("stockCode");
+                      clearError("stockName");
+                      // Auto-fetch current price
+                      try {
+                        const res = await fetch(`/api/stocks/price?code=${stock.stockCode}&market=${stock.stockMarket}`);
+                        if (res.ok) {
+                          const data = await res.json() as { price?: number };
+                          if (data.price) setS1((p) => ({ ...p, price: data.price!.toFixed(2) }));
+                        }
+                      } catch { /* ignore */ }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors hover:opacity-80"
+                    style={{
+                      backgroundColor: "var(--surface-overlay)",
+                      borderColor: "var(--border-subtle)",
+                      color: "var(--foreground)",
+                    }}
+                  >
+                    <span className="font-mono" style={{ color: "var(--brand-blue)" }}>{stock.stockCode}</span>
+                    <span>{stock.stockName}</span>
+                    <span
+                      className="text-[10px] px-1 py-0.5 rounded font-medium"
+                      style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "var(--muted-foreground)" }}
+                    >
+                      {stock.stockMarket === "SH" ? "沪" : stock.stockMarket === "SZ" ? "深" : "北"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Stock search */}
           <div className="space-y-1">
             <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>

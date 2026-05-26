@@ -9,6 +9,34 @@
 
 ---
 
+## 2026-05-26
+
+### 加仓/清仓快捷选股
+
+**需求**：选择"加仓"或"清仓"操作时，自动从历史决策卡带入股票信息，避免重复搜索。
+
+**实现**
+- `app/api/decisions/recent-stocks/route.ts`：新增接口，按 `MAX(COALESCE(traded_at, created_at))` 对 `stockCode` 去重聚合，返回最近 8 只股票
+- `components/decisions/decision-form.tsx`：挂载时预取最近股票；Step 1 中选择 ADD / CLEAR 且未选股时，在搜索框上方展示"从最近操作选择"芯片列表；点击芯片自动填入 stockCode / stockName / stockMarket 并拉取当前价格；选股后芯片区自动隐藏
+
+---
+
+### 移除 Google OAuth
+
+**原因**：香港部署方案下 Google 登录对大陆用户不可用，且图片识别（Gemini API）与 Google OAuth 无关联，可独立移除。
+
+**修改**
+- `auth.ts`：移除 `Google` provider 引入及配置
+- `app/(auth)/login/page.tsx`：删除 Google 登录按钮与分隔线，仅保留邮箱+密码登录
+
+---
+
+### DeepSeek v4-pro 图片识别验证
+
+**结论**：`deepseek-v4-pro` 模型存在且文本响应正常，但 API 层明确拒绝 `image_url` 消息类型（`unknown variant 'image_url', expected 'text'`），为纯文本模型，无法用于图片识别。图片识别继续使用 Gemini（`GEMINI_API_KEY`）。
+
+---
+
 ## 2026-05-25
 
 ### 卖出操作隐藏止损字段

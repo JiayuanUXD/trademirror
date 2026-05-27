@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const body: unknown = await req.json();
   const result = patchSchema.safeParse(body);
   if (!result.success) {
-    return NextResponse.json({ error: result.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: result.error.issues[0]?.message ?? "参数校验失败" }, { status: 400 });
   }
 
   const patch = result.data;

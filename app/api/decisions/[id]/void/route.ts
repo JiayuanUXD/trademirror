@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body: unknown = await req.json();
     const parsed = voidSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "参数校验失败" }, { status: 400 });
     }
 
     const existing = await getDecisionById(id, userId);

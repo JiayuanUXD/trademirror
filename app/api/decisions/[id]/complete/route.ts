@@ -12,7 +12,7 @@ const completeSchema = z.object({
   calmScore: z.number().int().min(1).max(10),
   confidenceScore: z.number().int().min(1).max(10),
   fomoScore: z.number().int().min(1).max(10),
-  stopLossPrice: z.number().positive("止损价必须大于 0"),
+  stopLossPrice: z.number().min(0, "止损价不能为负数"),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const body: unknown = await req.json();
   const parsed = completeSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "参数校验失败" }, { status: 400 });
   }
 
   const data = parsed.data;

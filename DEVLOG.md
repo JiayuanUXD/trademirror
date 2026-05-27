@@ -9,6 +9,44 @@
 
 ---
 
+## 2026-05-27
+
+### 补全决策卡卖出止损修复
+
+**问题**：补全决策卡（decision-sheet）时，卖出类操作仍要求填写止损价格，且提交 `stopLossPrice: 0` 被服务端 Zod schema（`.positive()`）拒绝，触发 `error.flatten()` 返回对象而非字符串，React 渲染崩溃。
+
+**修复**
+- `components/decisions/decision-sheet.tsx`：`handleComplete` 检测 `isSellAction`，跳过止损验证并传 0；UI 卖出时替换为灰色提示
+- `app/api/decisions/[id]/complete/route.ts`：`stopLossPrice` 校验从 `.positive()` 改为 `.min(0)`
+
+---
+
+### SSE 连接竞态崩溃修复
+
+**问题**：页面导航或提交后频繁出现 "This page couldn't load"，控制台报 `TypeError: Invalid state: Controller is already closed`。
+
+**根因**：`/api/alerts/sse` 的 `setInterval` 回调在 `abort` 事件触发 `controller.close()` 后仍有 in-flight 的 `getAlertStats` 异步操作，返回时对已关闭的 controller 调用 `enqueue()` 抛出异常。
+
+**修复**：`app/api/alerts/sse/route.ts`：增加 `closed` 标志，`sendUpdate` 在 await 前后双重检查；`controller.close()` 包裹 try-catch 防止二次抛出。
+
+---
+
+### API 错误返回对象导致 React 渲染崩溃
+
+**问题**：多个 API 路由返回 `error: parsed.error.flatten()`（Zod 的 `flatten()` 返回 `{ formErrors, fieldErrors }` 对象），客户端将其当字符串渲染 → "Objects are not valid as a React child"。
+
+**修复**：`[id]/route.ts`、`[id]/complete/route.ts`、`[id]/void/route.ts`、`batch/route.ts` 统一改为 `error: parsed.error.issues[0]?.message ?? "参数校验失败"`。
+
+---
+
+### 批量导入买入自动升级为加仓
+
+**需求**：已有持仓或历史决策的股票，通过图片批量导入时 AI 识别的 "BUY" 应自动改为 "ADD"。
+
+**实现**：`app/api/decisions/batch/route.ts`：提交前并行查询 `decisions` 表和 `holdings` 表收集已有 stockCode 集合，遍历导入数据将匹配的 BUY 自动转为 ADD。
+
+---
+
 ## 2026-05-26
 
 ### 加仓/清仓快捷选股

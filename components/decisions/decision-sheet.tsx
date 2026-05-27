@@ -196,11 +196,12 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
   }
 
   async function handleComplete() {
-    if (!decisionId) return;
-    const stopLoss = parseFloat(completeForm.stopLossPrice);
+    if (!decisionId || !decision) return;
+    const isSellAction = ["SELL", "REDUCE", "CLEAR"].includes(decision.action);
+    const stopLoss = isSellAction ? 0 : parseFloat(completeForm.stopLossPrice);
     if (!completeForm.reason.trim()) { setCompleteError("请填写决策理由"); return; }
     if (completeForm.basis.length === 0) { setCompleteError("请至少选择一项决策依据"); return; }
-    if (isNaN(stopLoss) || stopLoss <= 0) { setCompleteError("请输入有效的止损价格"); return; }
+    if (!isSellAction && (isNaN(stopLoss) || stopLoss <= 0)) { setCompleteError("请输入有效的止损价格"); return; }
     setCompleteError("");
     setCompleteLoading(true);
     try {
@@ -442,21 +443,30 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
                         })}
                       </div>
 
-                      {/* Stop loss */}
-                      <div>
-                        <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
-                          止损价格 * <span className="font-normal">（入场价 ¥{decision.price}）</span>
-                        </label>
-                        <input
-                          type="number"
-                          autoComplete="off"
-                          className="w-full h-9 px-3 rounded-md text-sm border"
-                          style={{ backgroundColor: "var(--surface-base)", borderColor: "var(--border-subtle)", color: "var(--foreground)" }}
-                          placeholder={`建议 ¥${(decision.price * 0.92).toFixed(2)}`}
-                          value={completeForm.stopLossPrice}
-                          onChange={(e) => setCompleteForm((p) => ({ ...p, stopLossPrice: e.target.value }))}
-                        />
-                      </div>
+                      {/* Stop loss — hidden for sell actions */}
+                      {["SELL", "REDUCE", "CLEAR"].includes(decision.action) ? (
+                        <div
+                          className="px-3 py-2 rounded-md text-xs"
+                          style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}
+                        >
+                          卖出操作无需预设止损，已自动跳过
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="text-xs font-medium block mb-1.5" style={{ color: "var(--muted-foreground)" }}>
+                            止损价格 * <span className="font-normal">（入场价 ¥{decision.price}）</span>
+                          </label>
+                          <input
+                            type="number"
+                            autoComplete="off"
+                            className="w-full h-9 px-3 rounded-md text-sm border"
+                            style={{ backgroundColor: "var(--surface-base)", borderColor: "var(--border-subtle)", color: "var(--foreground)" }}
+                            placeholder={`建议 ¥${(decision.price * 0.92).toFixed(2)}`}
+                            value={completeForm.stopLossPrice}
+                            onChange={(e) => setCompleteForm((p) => ({ ...p, stopLossPrice: e.target.value }))}
+                          />
+                        </div>
+                      )}
 
                       {completeError && (
                         <p className="text-xs" style={{ color: "var(--brand-red)" }}>{completeError}</p>

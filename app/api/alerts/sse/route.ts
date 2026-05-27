@@ -13,9 +13,14 @@ export async function GET(req: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
+
       const sendUpdate = async () => {
+        if (closed) return;
         try {
           const stats = await getAlertStats(userId);
+          // Re-check after await: connection may have closed while DB query ran
+          if (closed) return;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(stats)}\n\n`));
         } catch (e) {
           console.error("SSE Update Error:", e);
@@ -24,11 +29,16 @@ export async function GET(req: NextRequest) {
 
       await sendUpdate();
 
-      const interval = setInterval(sendUpdate, 10000);
+      const interval = setInterval(() => { void sendUpdate(); }, 10000);
 
       req.signal.addEventListener("abort", () => {
+        closed = true;
         clearInterval(interval);
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Controller may already be closed or errored — safe to ignore
+        }
       });
     },
   });

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { batchCreateDecisions, type BatchInsertDecision } from "@/lib/db/queries/decisions";
+import { db } from "@/lib/db";
+import { decisions, holdings } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 function inferMarket(code: string): "SH" | "SZ" | "BJ" {
@@ -32,15 +35,30 @@ export async function POST(req: NextRequest) {
   const body: unknown = await req.json();
   const parsed = batchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "参数校验失败" }, { status: 400 });
   }
+
+  // Fetch existing stock codes from decisions + holdings to auto-upgrade BUY → ADD
+  const [existingDecisions, existingHoldings] = await Promise.all([
+    db.select({ stockCode: decisions.stockCode })
+      .from(decisions)
+      .where(eq(decisions.userId, userId)),
+    db.select({ stockCode: holdings.stockCode })
+      .from(holdings)
+      .where(eq(holdings.userId, userId)),
+  ]);
+  const ownedStockCodes = new Set([
+    ...existingDecisions.map((r) => r.stockCode),
+    ...existingHoldings.map((r) => r.stockCode),
+  ]);
 
   const items: BatchInsertDecision[] = parsed.data.trades.map((t) => ({
     id: crypto.randomUUID(),
     stockCode: t.stockCode,
     stockName: t.stockName,
     stockMarket: t.stockMarket ?? inferMarket(t.stockCode),
-    action: t.action,
+    // Auto-upgrade: BUY → ADD if this stock already has history
+    action: t.action === "BUY" && ownedStockCodes.has(t.stockCode) ? "ADD" : t.action,
     price: t.price,
     quantity: t.quantity,
     tradedAt: t.tradedAt ? new Date(t.tradedAt).getTime() : undefined,

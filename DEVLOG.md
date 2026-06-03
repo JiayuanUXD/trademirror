@@ -9,6 +9,26 @@
 
 ---
 
+## 2026-06-03
+
+### 决策卡表单体验优化
+
+- **日期选择器**：`datetime-local` 输入框添加 `onClick → showPicker()`，点击任意区域均可触发日历弹窗
+- **止损价默认 8%**：`stopLossPercent` 初始值从空改为 `"8"`，输入价格后自动计算 92% 止损价
+- **补全自动切换**：`DecisionSheet` 新增 `incompleteIds` + `onNavigateToNext` props，补全成功后自动跳转到下一个未补全的决策卡
+
+---
+
+### Vercel 环境变量修复（图片识别 API 错误）
+
+**问题**：线上图片识别提示 API 错误（503 未配置 Vision API Key）。
+
+**根因**：Vercel 环境变量名为 `Gemini`（错误），代码读取 `GEMINI_API_KEY`（正确），变量名不匹配导致 `geminiKey` 为 `undefined`，回退到 DeepSeek 但 DeepSeek 不支持图片。
+
+**修复**：`vercel env add GEMINI_API_KEY production`，删除旧的 `Gemini` 变量。
+
+---
+
 ## 2026-05-27
 
 ### 补全决策卡卖出止损修复

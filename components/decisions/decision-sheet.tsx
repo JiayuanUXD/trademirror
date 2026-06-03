@@ -40,6 +40,10 @@ type Props = {
   variant?: "sheet" | "panel";
   /** When true, the inline completion form is expanded immediately on open. */
   autoExpandComplete?: boolean;
+  /** IDs of incomplete decisions — after completing one, auto-navigate to the next. */
+  incompleteIds?: string[];
+  /** Called when auto-navigating to the next incomplete decision. */
+  onNavigateToNext?: (nextId: string) => void;
 };
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -71,7 +75,7 @@ const alignmentColors: Record<string, string> = {
   NOT_ALIGN: "var(--brand-red)",
 };
 
-export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant = "sheet", autoExpandComplete = false }: Props) {
+export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant = "sheet", autoExpandComplete = false, incompleteIds = [], onNavigateToNext }: Props) {
   const [decision, setDecision] = useState<Decision | null>(null);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [errorTypes, setErrorTypes] = useState<ErrorType[]>([]);
@@ -219,6 +223,18 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
       setDecision(updated);
       setShowCompleteForm(false);
       onDecisionChange?.();
+
+      // Auto-navigate to next incomplete decision
+      if (incompleteIds.length > 0 && decisionId) {
+        const currentIdx = incompleteIds.indexOf(decisionId);
+        const remaining = incompleteIds.filter((id) => id !== decisionId);
+        if (remaining.length > 0) {
+          const nextId = remaining[currentIdx >= remaining.length ? 0 : Math.max(0, currentIdx)];
+          if (onNavigateToNext) {
+            onNavigateToNext(nextId);
+          }
+        }
+      }
     } catch {
       setCompleteError("网络错误，请重试");
     } finally {

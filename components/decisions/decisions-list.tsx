@@ -178,6 +178,8 @@ export function DecisionsList({ decisions }: Props) {
         onClose={() => { setSelectedId(null); setOpenForComplete(false); }}
         onDecisionChange={() => router.refresh()}
         autoExpandComplete={openForComplete}
+        incompleteIds={decisions.filter((d) => d.incomplete && d.status === "ACTIVE").map((d) => d.id)}
+        onNavigateToNext={(nextId) => { setSelectedId(nextId); setOpenForComplete(true); }}
       />
       {showImportModal && (
         <ImportVisionModal onClose={() => { setShowImportModal(false); router.refresh(); }} />

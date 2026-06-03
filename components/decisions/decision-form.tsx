@@ -114,7 +114,7 @@ export function DecisionForm() {
     systemAlignment: "ALIGN",
   });
   const [stopLossMode, setStopLossMode] = useState<"pct" | "price">("pct");
-  const [stopLossPercent, setStopLossPercent] = useState<string>("");
+  const [stopLossPercent, setStopLossPercent] = useState<string>("8");
 
   // Recompute stopLossPrice when entry price changes in pct mode (Fix #4 & #11)
   useEffect(() => {
@@ -448,7 +448,7 @@ export function DecisionForm() {
             )}
           </div>
 
-          {/* Date/time */}
+          {/* Date/time — click anywhere opens picker */}
           <div className="space-y-1">
             <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
               交易时间（留空默认当前）
@@ -456,14 +456,15 @@ export function DecisionForm() {
             <input
               type="datetime-local"
               autoComplete="off"
-              className="w-full h-9 px-3 rounded-md text-sm border"
+              className="w-full h-9 px-3 rounded-md text-sm border cursor-pointer"
               style={{
                 backgroundColor: "var(--surface-overlay)",
                 borderColor: "var(--border-subtle)",
-                color: "var(--foreground)",
+                color: s1.tradedAt ? "var(--foreground)" : "var(--muted-foreground)",
               }}
               value={s1.tradedAt}
               onChange={(e) => setS1((p) => ({ ...p, tradedAt: e.target.value }))}
+              onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
             />
           </div>
 

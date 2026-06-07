@@ -21,11 +21,18 @@ import {
 import { ChartsClient } from "@/components/analytics/charts-client";
 import { InsightCard } from "@/components/analytics/insight-card";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const BEIJING_TZ = "Asia/Shanghai";
 
 export const dynamic = "force-dynamic";
 
 function getGreeting(): string {
-  const h = new Date().getHours();
+  const h = dayjs().tz(BEIJING_TZ).hour();
   if (h < 6) return "深夜了，注意休息";
   if (h < 9) return "早安，今天保持纪律";
   if (h < 12) return "上午好，市场开盘了";

@@ -44,6 +44,7 @@
     "eslint-config-next": "16.2.6",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.4",
+    "pinyin-pro": "^3.28.1",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.3.0",
     "typescript": "^5",

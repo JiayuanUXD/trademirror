@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { loadStockList, searchStocks, type StockData } from "@/lib/stock-search";
 
 export type StockItem = {
   code: string;
@@ -9,7 +10,6 @@ export type StockItem = {
 };
 
 const MARKET_LABELS: Record<string, string> = { SH: "沪", SZ: "深", BJ: "北" };
-const CACHE_MAX = 10;
 
 type Props = {
   onSelect: (stock: StockItem) => void;
@@ -24,98 +24,50 @@ export function StockCombobox({ onSelect, initialCode, initialName, placeholder 
   );
   const [results, setResults] = useState<StockItem[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
-  const [fetchError, setFetchError] = useState(false);
+  const [listReady, setListReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const abortRef = useRef<AbortController | null>(null);
-  const cacheRef = useRef<Map<string, StockItem[]>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
   const suppressBlurRef = useRef(false);
+  const stockListRef = useRef<StockData[]>([]);
 
-  const search = useCallback(async (q: string) => {
+  // Preload stock list on mount
+  useEffect(() => {
+    loadStockList().then((list) => {
+      stockListRef.current = list;
+      setListReady(list.length > 0);
+    });
+  }, []);
+
+  const search = useCallback((q: string) => {
     const trimmed = q.trim();
     if (!trimmed) {
       setResults([]);
       setOpen(false);
-      setFetchError(false);
       return;
     }
 
-    // Check cache first (LRU: re-insert on hit to mark as recently used)
-    const cached = cacheRef.current.get(trimmed);
-    if (cached) {
-      cacheRef.current.delete(trimmed);
-      cacheRef.current.set(trimmed, cached);
-      setResults(cached);
-      setOpen(cached.length > 0);
-      setActiveIdx(-1);
-      setLoading(false);
-      setFetchError(false);
-      return;
-    }
+    const matches = searchStocks(trimmed, stockListRef.current, 10);
+    const items: StockItem[] = matches.map((s) => ({
+      code: s.c,
+      name: s.n,
+      market: s.m,
+    }));
 
-    // Cancel previous in-flight request
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLoading(true);
-    setFetchError(false);
-    try {
-      const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(trimmed)}`, {
-        signal: controller.signal,
-      });
-      if (res.ok) {
-        const data: StockItem[] = await res.json();
-        // Evict least-recently-used entry (first key in insertion order)
-        if (cacheRef.current.size >= CACHE_MAX) {
-          const firstKey = cacheRef.current.keys().next().value;
-          if (firstKey !== undefined) cacheRef.current.delete(firstKey);
-        }
-        cacheRef.current.set(trimmed, data);
-        setResults(data);
-        setOpen(data.length > 0);
-        setActiveIdx(-1);
-        setFetchError(false);
-      } else {
-        setResults([]);
-        setOpen(false);
-        setFetchError(false);
-      }
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setFetchError(true);
-      // Try cache with partial match
-      for (const [key, val] of cacheRef.current) {
-        if (key.includes(trimmed) || trimmed.includes(key)) {
-          setResults(val);
-          setOpen(val.length > 0);
-          setActiveIdx(-1);
-          return;
-        }
-      }
-      setResults([]);
-      setOpen(false);
-    } finally {
-      if (controller === abortRef.current) {
-        setLoading(false);
-      }
-    }
+    setResults(items);
+    setOpen(items.length > 0);
+    setActiveIdx(-1);
   }, []);
 
   function handleChange(value: string) {
     setQuery(value);
-    setFetchError(false);
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => search(value), 300);
+    // Local search is instant — no debounce needed
+    search(value);
   }
 
   function handleSelect(item: StockItem) {
     setQuery(`${item.code} ${item.name}`);
     setOpen(false);
-    setFetchError(false);
     onSelect(item);
   }
 
@@ -160,13 +112,6 @@ export function StockCombobox({ onSelect, initialCode, initialName, placeholder 
     }, 150);
   }
 
-  useEffect(() => {
-    return () => {
-      clearTimeout(timerRef.current);
-      abortRef.current?.abort();
-    };
-  }, []);
-
   return (
     <div ref={containerRef} className="relative">
       <input
@@ -175,11 +120,11 @@ export function StockCombobox({ onSelect, initialCode, initialName, placeholder 
         value={query}
         onChange={(e) => handleChange(e.target.value)}
         onFocus={() => {
-          if (results.length > 0 || fetchError) setOpen(true);
+          if (results.length > 0) setOpen(true);
         }}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder || "输入股票代码或名称"}
+        placeholder={placeholder || (listReady ? "代码/名称/拼音首字母（如 zgjs）" : "加载股票列表中...")}
         className="w-full px-3 py-2 rounded-md text-sm outline-none"
         style={{
           backgroundColor: "var(--surface-overlay)",
@@ -188,14 +133,6 @@ export function StockCombobox({ onSelect, initialCode, initialName, placeholder 
         }}
         autoComplete="off"
       />
-      {loading && (
-        <div
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
-          style={{ color: "var(--muted-foreground)" }}
-        >
-          ...
-        </div>
-      )}
       {open && (
         <div
           className="absolute z-50 w-full mt-1 rounded-md border overflow-hidden shadow-lg max-h-60 overflow-y-auto"
@@ -206,14 +143,7 @@ export function StockCombobox({ onSelect, initialCode, initialName, placeholder 
           onMouseDown={() => { suppressBlurRef.current = true; }}
           onTouchStart={() => { suppressBlurRef.current = true; }}
         >
-          {fetchError && results.length === 0 ? (
-            <div
-              className="px-3 py-2 text-xs"
-              style={{ color: "var(--muted-foreground)" }}
-            >
-              搜索暂时不可用，请手动输入
-            </div>
-          ) : results.length > 0 ? (
+          {results.length > 0 ? (
             <ul>
               {results.map((item, idx) => (
                 <li
@@ -240,14 +170,6 @@ export function StockCombobox({ onSelect, initialCode, initialName, placeholder 
               ))}
             </ul>
           ) : null}
-          {fetchError && results.length > 0 && (
-            <div
-              className="px-3 py-1.5 text-[10px] border-t"
-              style={{ color: "var(--color-warning)", borderColor: "var(--border-subtle)" }}
-            >
-              网络异常，显示缓存结果
-            </div>
-          )}
         </div>
       )}
     </div>

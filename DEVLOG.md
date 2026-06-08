@@ -9,6 +9,24 @@
 
 ---
 
+## 2026-06-08
+
+### 决策卡搜索功能
+
+- `decisions-list.tsx` 新增搜索栏，支持按股票代码或名称模糊搜索（不区分大小写）
+- 搜索与状态筛选联动，空结果显示友好提示
+
+### 股票名称空格规范化
+
+**问题**：同一股票（如 515880 通信ETF）因名称中空格不一致（"通信 ETF" vs "通信ETF"）导致持仓聚合异常。
+
+**修复**：在所有决策卡入口统一 `stockName.replace(/\s/g, "")` 去除空格：
+- `app/api/decisions/route.ts`（手动新建）
+- `app/api/decisions/batch/route.ts`（批量导入）
+- `app/api/decisions/import-vision/route.ts`（图片识别导入）
+
+---
+
 ## 2026-06-03
 
 ### 决策卡表单体验优化

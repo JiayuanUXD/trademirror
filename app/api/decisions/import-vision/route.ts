@@ -242,7 +242,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           .map((t) => ({
             ...t,
             stockCode: typeof t.stockCode === "string" ? t.stockCode : "",
-            stockName: typeof t.stockName === "string" ? t.stockName : "",
+            stockName: typeof t.stockName === "string" ? t.stockName.replace(/\s/g, "") : "",
             action: (["BUY","ADD","SELL","REDUCE","CLEAR"].includes(t.action as string) ? t.action : "BUY") as RecognizedTrade["action"],
             price: t.price as number,
             quantity: t.quantity as number,

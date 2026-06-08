@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   const items: BatchInsertDecision[] = parsed.data.trades.map((t) => ({
     id: crypto.randomUUID(),
     stockCode: t.stockCode,
-    stockName: t.stockName,
+    stockName: t.stockName.replace(/\s/g, ""),
     stockMarket: t.stockMarket ?? inferMarket(t.stockCode),
     // Auto-upgrade: BUY → ADD if this stock already has history
     action: t.action === "BUY" && ownedStockCodes.has(t.stockCode) ? "ADD" : t.action,

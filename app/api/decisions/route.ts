@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const decision = await createDecision({
       id: crypto.randomUUID(),
       stockCode: data.stockCode,
-      stockName: data.stockName,
+      stockName: data.stockName.replace(/\s/g, ""),
       stockMarket: data.stockMarket,
       action: data.action,
       price: data.price,

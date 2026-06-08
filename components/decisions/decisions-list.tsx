@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, AlertTriangle, TrendingUp, TrendingDown,
-  Ban, Archive, Camera, PenLine, MoreHorizontal,
+  Ban, Archive, Camera, PenLine, MoreHorizontal, Search, X,
 } from "lucide-react";
 import { ACTION_LABELS, type DecisionAction, type DecisionStatus } from "@/types/decision";
 import type { Decision, VoidedReason } from "@/types/decision";
@@ -36,13 +36,19 @@ export function DecisionsList({ decisions }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openForComplete, setOpenForComplete] = useState(false);
   const [statusFilter, setStatusFilter] = useState<DecisionStatus | "ALL">("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showImportModal, setShowImportModal] = useState(false);
   // Tracks which row's "更多" dropdown is open
   const [openMoreId, setOpenMoreId] = useState<string | null>(null);
 
-  const filtered = statusFilter === "ALL"
-    ? decisions
-    : decisions.filter((d) => d.status === statusFilter);
+  const filtered = decisions.filter((d) => {
+    if (statusFilter !== "ALL" && d.status !== statusFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return d.stockCode.toLowerCase().includes(q) || d.stockName.toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   const incompleteCount = decisions.filter((d) => d.incomplete && d.status === "ACTIVE").length;
 
@@ -67,29 +73,58 @@ export function DecisionsList({ decisions }: Props) {
         </div>
       )}
 
-      {/* Filter bar */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex gap-1.5 flex-wrap">
-          {STATUS_FILTERS.map((f) => {
-            const isActive = statusFilter === f.value;
-            return (
-              <button key={f.value} type="button" onClick={() => setStatusFilter(f.value)}
-                className="text-xs px-3 py-1.5 rounded-full transition-colors"
-                style={{
-                  backgroundColor: isActive ? "var(--brand-blue)" : "var(--surface-overlay)",
-                  color: isActive ? "#fff" : "var(--muted-foreground)",
-                  border: `1px solid ${isActive ? "var(--brand-blue)" : "var(--border-subtle)"}`,
-                }}>
-                {f.label}
-              </button>
-            );
-          })}
+      {/* Filter bar + Search */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
+            {STATUS_FILTERS.map((f) => {
+              const isActive = statusFilter === f.value;
+              return (
+                <button key={f.value} type="button" onClick={() => setStatusFilter(f.value)}
+                  className="text-xs px-3 py-1.5 rounded-full transition-colors"
+                  style={{
+                    backgroundColor: isActive ? "var(--brand-blue)" : "var(--surface-overlay)",
+                    color: isActive ? "#fff" : "var(--muted-foreground)",
+                    border: `1px solid ${isActive ? "var(--brand-blue)" : "var(--border-subtle)"}`,
+                  }}>
+                  {f.label}
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)", border: "1px solid var(--border-subtle)" }}>
+            <Camera size={13} /> 截图导入
+          </button>
         </div>
-        <button type="button" onClick={() => setShowImportModal(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-opacity hover:opacity-80"
-          style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)", border: "1px solid var(--border-subtle)" }}>
-          <Camera size={13} /> 截图导入
-        </button>
+        {/* Search */}
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "var(--muted-foreground)" }} />
+          <input
+            type="text"
+            autoComplete="off"
+            placeholder="搜索股票代码或名称"
+            className="w-full h-8 pl-8 pr-8 rounded-lg text-xs border"
+            style={{
+              backgroundColor: "var(--surface-overlay)",
+              borderColor: "var(--border-subtle)",
+              color: "var(--foreground)",
+            }}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:opacity-70"
+              style={{ color: "var(--muted-foreground)" }}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Empty states */}
@@ -120,7 +155,9 @@ export function DecisionsList({ decisions }: Props) {
         <div className="rounded-xl border flex items-center justify-center py-20"
           style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)" }}>
           <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-            没有{STATUS_FILTERS.find((f) => f.value === statusFilter)?.label ?? ""}的决策卡
+            {searchQuery
+              ? `未找到"${searchQuery}"相关的决策卡`
+              : `没有${STATUS_FILTERS.find((f) => f.value === statusFilter)?.label ?? ""}的决策卡`}
           </p>
         </div>
       )}

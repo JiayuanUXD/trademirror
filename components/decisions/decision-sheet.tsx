@@ -147,6 +147,17 @@ export function DecisionSheet({ decisionId, onClose, onDecisionChange, variant =
     return () => controller.abort();
   }, [decisionId, fetchData, autoExpandComplete]);
 
+  // Default stop loss to 92% of entry price once decision is loaded
+  useEffect(() => {
+    if (!decision || !decision.incomplete) return;
+    const isSellAction = ["SELL", "REDUCE", "CLEAR"].includes(decision.action);
+    if (isSellAction) return;
+    setCompleteForm((p) => ({
+      ...p,
+      stopLossPrice: p.stopLossPrice || (decision.price * 0.92).toFixed(2),
+    }));
+  }, [decision]);
+
   // ESC to close (sheet mode only)
   useEffect(() => {
     if (!open || variant !== "sheet") return;

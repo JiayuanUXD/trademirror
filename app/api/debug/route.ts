@@ -7,6 +7,13 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const results: Record<string, string> = {};
 
+  // Test 0: env vars
+  const dbUrl = process.env.TURSO_DATABASE_URL ?? "(not set)";
+  const authToken = process.env.TURSO_AUTH_TOKEN ?? "(not set)";
+  results["env_db_url"] = dbUrl.length > 20 ? `${dbUrl.substring(0, 20)}...${dbUrl.substring(dbUrl.length - 10)}` : dbUrl;
+  results["env_token_len"] = String(authToken.length);
+  results["env_token_prefix"] = authToken.substring(0, 10) + "...";
+
   // Test 1: basic connection
   try {
     const r = await client.execute("SELECT 1 as ok");

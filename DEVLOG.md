@@ -40,6 +40,15 @@
 - 改为 `listRecentDigests(userId, 1)` 直接从 DB 取最新简报，完全移除 Tushare 依赖
 - MarketBar 组件在 Vercel 线上环境恢复正常显示
 
+### Vercel 生产环境全面不可用修复
+
+- **现象**：所有页面显示"This page couldn't load"，服务端渲染挂起（45s 超时）
+- **排查**：添加临时 `/api/debug` 诊断端点，发现 Turso 返回 `SERVER_ERROR: Server returned HTTP status 400`，所有数据库查询失败
+- **根因**：Vercel 生产环境的 `TURSO_AUTH_TOKEN` 失效，导致 libSQL 客户端无法认证
+- **影响链**：Token 失效 → migration 报错 → `migrated` 标志不置 true → 每个请求重试 migration 再失败 → 页面数据全空
+- **修复**：用本地已验证可用的 Turso 凭据重新写入 Vercel 环境变量（`vercel env add --force`），重新部署后恢复正常
+- **教训**：Turso Token 过期或失效不会在构建阶段报错，仅在运行时体现为 HTTP 400；建议定期检查 `vercel env ls` 中凭据有效性
+
 ---
 
 ## 2026-06-08

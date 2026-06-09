@@ -41,6 +41,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(digest);
   }
 
+  // 仅读缓存模式（不触发生成，不依赖 Tushare）
+  if (mode === "cached") {
+    const recent = await listRecentDigests(userId, 1);
+    if (recent.length === 0) {
+      return NextResponse.json({ error: "暂无缓存" }, { status: 404 });
+    }
+    return NextResponse.json(recent[0]);
+  }
+
   // 流式模式
   if (mode === "stream") {
     const encoder = new TextEncoder();

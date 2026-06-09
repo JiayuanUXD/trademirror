@@ -34,6 +34,12 @@
 - Middleware 增加 `/s/` 路径白名单，跳过认证检查
 - 盘后简报详情页标题右侧新增"分享"按钮，点击生成短链并自动复制到剪贴板
 
+### Vercel 大盘数据加载修复
+
+- `GET /api/digest?mode=cached` 原先调用 `getLastTradingDay()`（依赖 Tushare API），Vercel 未配置 `TUSHARE_API_TOKEN` 导致 503
+- 改为 `listRecentDigests(userId, 1)` 直接从 DB 取最新简报，完全移除 Tushare 依赖
+- MarketBar 组件在 Vercel 线上环境恢复正常显示
+
 ---
 
 ## 2026-06-08

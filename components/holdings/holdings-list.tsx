@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, AlertTriangle, TrendingUp, TrendingDown, FilePlus } from "lucide-react";
+import Link from "next/link";
+import {
+  Plus, AlertTriangle, TrendingUp, TrendingDown, FilePlus, ShoppingCart, DollarSign,
+} from "lucide-react";
 import type { Holding, HoldingStatus } from "@/types/holding";
 import { STATUS_LABELS, STATUS_COLORS } from "@/types/holding";
 import { inferSector } from "@/lib/sector-inference";
+import { useStockPrices } from "@/lib/use-stock-prices";
 import { HoldingSheet, type HoldingSheetMode } from "./holding-sheet";
+import { DecisionDrawer, DECISION_DRAWER_CLOSED, type DecisionDrawerState } from "./decision-drawer";
+import { useDigestSignals } from "./market-bar";
+import type { DecisionAction } from "@/types/decision";
+import dayjs from "dayjs";
 
 // ─── Filter config ────────────────────────────────────────────────────────────
 
-const STATUS_FILTERS: { value: HoldingStatus | "ALL"; label: string }[] = [
-  { value: "ALL",      label: "全部" },
+const STATUS_FILTERS: { value: HoldingStatus; label: string }[] = [
   { value: "HOLDING",  label: "持有" },
   { value: "WATCHING", label: "观察" },
   { value: "CLOSED",   label: "已清仓" },
@@ -35,20 +42,150 @@ function healthColor(score: number): string {
   return "var(--brand-red)";
 }
 
+function holdingDays(h: Holding): number | null {
+  const start = h.firstBuyAt;
+  if (!start) return null;
+  return Math.floor((Date.now() - start) / 86_400_000);
+}
+
+function getPrice(h: Holding, prices: Map<string, number>): number | null {
+  return prices.get(h.stockCode) ?? h.currentPrice ?? null;
+}
+
+function pnlAmount(h: Holding, prices: Map<string, number>): number | null {
+  const cp = getPrice(h, prices);
+  if (!cp || !h.costPrice || h.shares <= 0) return null;
+  return (cp - h.costPrice) * h.shares;
+}
+
+function pnlPercent(h: Holding, prices: Map<string, number>): number | null {
+  const cp = getPrice(h, prices);
+  if (!cp || !h.costPrice) return null;
+  return ((cp - h.costPrice) / h.costPrice) * 100;
+}
+
+function formatPnlAmount(amount: number): string {
+  const abs = Math.abs(amount);
+  if (abs >= 10_000) return `${(amount / 10_000).toFixed(2)}万`;
+  return `${amount.toFixed(0)}`;
+}
+
+// ─── Action buttons ──────────────────────────────────────────────────────────
+
+function ActionButtons({ h, onAction }: { h: Holding; onAction: (h: Holding, action: DecisionAction) => void }) {
+  const isBuy = h.status === "HOLDING" || h.status === "WATCHING";
+  const isHolding = h.status === "HOLDING";
+  const btnBase = "inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-opacity hover:opacity-80 whitespace-nowrap cursor-pointer";
+
+  return (
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      {isBuy && (
+        <button
+          type="button"
+          onClick={() => onAction(h, isHolding ? "ADD" : "BUY")}
+          className={btnBase}
+          style={{ backgroundColor: "rgba(var(--color-up-rgb, 239,68,68),0.08)", color: "var(--color-up)", border: "1px solid rgba(var(--color-up-rgb,239,68,68),0.2)" }}
+        >
+          <ShoppingCart size={11} /> {isHolding ? "加仓" : "买入"}
+        </button>
+      )}
+      {isHolding && (
+        <button
+          type="button"
+          onClick={() => onAction(h, "SELL")}
+          className={btnBase}
+          style={{ backgroundColor: "rgba(var(--color-down-rgb, 22,163,74),0.08)", color: "var(--color-down)", border: "1px solid rgba(var(--color-down-rgb,22,163,74),0.2)" }}
+        >
+          <DollarSign size={11} /> 卖出
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── PnL display ─────────────────────────────────────────────────────────────
+
+function PnlDisplay({ h, prices, showAmount = false }: { h: Holding; prices: Map<string, number>; showAmount?: boolean }) {
+  const pct = pnlPercent(h, prices);
+  const amt = pnlAmount(h, prices);
+  const cp = getPrice(h, prices);
+  if (pct === null) return <span className="text-xs opacity-30" style={{ color: "var(--muted-foreground)" }}>—</span>;
+
+  const color = pct >= 0 ? "var(--color-up)" : "var(--color-down)";
+  return (
+    <div className="text-right">
+      {cp && (
+        <div className="text-[11px] tabular-nums" style={{ color: "var(--muted-foreground)" }}>
+          现价 ¥{cp.toLocaleString()}
+        </div>
+      )}
+      <div className="text-sm font-bold tabular-nums" style={{ color }}>
+        {pct >= 0 ? "+" : ""}{pct.toFixed(2)}%
+      </div>
+      {showAmount && amt !== null && (
+        <div className="text-[11px] tabular-nums" style={{ color }}>
+          {amt >= 0 ? "+" : ""}¥{formatPnlAmount(amt)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Holding days badge ──────────────────────────────────────────────────────
+
+function DaysBadge({ h }: { h: Holding }) {
+  const days = holdingDays(h);
+  if (days === null) return null;
+  return (
+    <span
+      className="text-[10px] px-1.5 py-0.5 rounded-md tabular-nums"
+      style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}
+    >
+      {days}天
+    </span>
+  );
+}
+
+// ─── Digest signal badge ─────────────────────────────────────────────────────
+
+const RATING_LABEL = { bullish: "偏多", neutral: "中性", bearish: "偏空" } as const;
+
+function signalBadgeStyle(r: "bullish" | "neutral" | "bearish") {
+  switch (r) {
+    case "bullish": return { color: "var(--color-up)", bg: "rgba(239,68,68,0.1)" };
+    case "bearish": return { color: "var(--color-down)", bg: "rgba(34,197,94,0.1)" };
+    default: return { color: "var(--muted-foreground)", bg: "rgba(148,163,184,0.08)" };
+  }
+}
+
+function SignalBadge({ stockCode }: { stockCode: string }) {
+  const { signals } = useDigestSignals();
+  const sig = signals.get(stockCode);
+  if (!sig) return null;
+
+  const rs = signalBadgeStyle(sig.rating);
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded"
+      style={{ color: rs.color, backgroundColor: rs.bg }}
+    >
+      {RATING_LABEL[sig.rating]}
+      <span className="opacity-60 font-normal">{sig.bullCount}多{sig.bearCount}空</span>
+    </span>
+  );
+}
+
 // ─── Mobile card ──────────────────────────────────────────────────────────────
 
-function HoldingRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void }) {
+function HoldingRow({ h, onOpen, prices, onAction }: { h: Holding; onOpen: (h: Holding) => void; prices: Map<string, number>; onAction: (h: Holding, action: DecisionAction) => void }) {
   const accent     = STATUS_ACCENT[h.status] ?? "var(--border-subtle)";
   const sector     = resolvedSector(h);
-  const pnlPct     = h.currentPrice && h.costPrice ? ((h.currentPrice - h.costPrice) / h.costPrice) * 100 : null;
   const amountWan  = (h.costPrice * h.shares) / 10_000;
   const noExit     = h.exitConditions.length === 0 && h.status === "HOLDING";
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(h)}
-      className="w-full text-left block rounded-xl border p-4 transition-colors card-interactive"
+    <div
+      className="rounded-xl border transition-colors"
       style={{
         borderColor: "var(--border-subtle)",
         backgroundColor: "var(--surface-card)",
@@ -56,85 +193,83 @@ function HoldingRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void })
         borderLeftColor: accent,
       }}
     >
-      {/* Top row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm" style={{ color: "var(--foreground)" }}>{h.stockName}</span>
-            <span className="text-xs font-mono" style={{ color: "var(--muted-foreground)" }}>{h.stockCode}</span>
-            {sector && (
-              <span
-                className="text-[10px] px-1.5 py-0.5 rounded-md"
-                style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}
-              >
-                {sector}
-              </span>
-            )}
-            {noExit && (
-              <span
-                className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md font-medium"
-                style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "var(--brand-warning)" }}
-              >
-                <AlertTriangle size={9} /> 无止损
-              </span>
-            )}
+      <button
+        type="button"
+        onClick={() => onOpen(h)}
+        className="w-full text-left block p-4 card-interactive"
+      >
+        {/* Top row */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm" style={{ color: "var(--foreground)" }}>{h.stockName}</span>
+              <span className="text-xs font-mono" style={{ color: "var(--muted-foreground)" }}>{h.stockCode}</span>
+              {sector && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+                  style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}>
+                  {sector}
+                </span>
+              )}
+              <DaysBadge h={h} />
+              <SignalBadge stockCode={h.stockCode} />
+              {noExit && (
+                <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+                  style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "var(--brand-warning)" }}>
+                  <AlertTriangle size={9} /> 无止损
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              {h.shares > 0 ? (
+                <>
+                  <span>成本 ¥{h.costPrice.toLocaleString()}</span>
+                  <span className="opacity-40">·</span>
+                  <span>{h.shares.toLocaleString()} 股</span>
+                  {amountWan >= 0.01 && (
+                    <>
+                      <span className="opacity-40">·</span>
+                      <span>¥{amountWan.toFixed(1)} 万</span>
+                    </>
+                  )}
+                </>
+              ) : <span>已清仓</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
-            {h.shares > 0 ? (
-              <>
-                <span>成本 ¥{h.costPrice.toLocaleString()}</span>
-                <span className="opacity-40">·</span>
-                <span>{h.shares.toLocaleString()} 股</span>
-                {amountWan >= 0.01 && (
-                  <>
-                    <span className="opacity-40">·</span>
-                    <span>¥{amountWan.toFixed(1)} 万</span>
-                  </>
-                )}
-              </>
-            ) : <span>已清仓</span>}
+          <PnlDisplay h={h} prices={prices} showAmount />
+        </div>
+
+        {/* Health bar */}
+        <div className="mt-3 space-y-1">
+          <div className="flex items-center justify-between" style={{ fontSize: "11px", color: "var(--muted-foreground)" }}>
+            <span>档案健康度</span>
+            <span className="font-semibold" style={{ color: healthColor(h.healthScore) }}>{h.healthScore}</span>
+          </div>
+          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: "var(--surface-overlay)" }}>
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${h.healthScore}%`, backgroundColor: healthColor(h.healthScore) }} />
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <span
-            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-            style={{ color: STATUS_COLORS[h.status], backgroundColor: `${STATUS_COLORS[h.status]}1A` }}
-          >
+      </button>
+
+      {/* Action bar */}
+      {h.status !== "CLOSED" && (
+        <div className="flex items-center justify-between px-4 py-2"
+          style={{ borderTop: "1px solid var(--border-subtle)", backgroundColor: "var(--surface-overlay)" }}>
+          <ActionButtons h={h} onAction={onAction} />
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+            style={{ color: STATUS_COLORS[h.status], backgroundColor: `${STATUS_COLORS[h.status]}1A` }}>
             {STATUS_LABELS[h.status]}
           </span>
-          {pnlPct !== null && (
-            <span
-              className="text-xs font-bold tabular-nums"
-              style={{ color: pnlPct >= 0 ? "var(--color-up)" : "var(--color-down)" }}
-            >
-              {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-            </span>
-          )}
         </div>
-      </div>
-
-      {/* Health bar */}
-      <div className="mt-3 space-y-1">
-        <div className="flex items-center justify-between" style={{ fontSize: "11px", color: "var(--muted-foreground)" }}>
-          <span>档案健康度</span>
-          <span className="font-semibold" style={{ color: healthColor(h.healthScore) }}>{h.healthScore}</span>
-        </div>
-        <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: "var(--surface-overlay)" }}>
-          <div
-            className="h-full rounded-full transition-all"
-            style={{ width: `${h.healthScore}%`, backgroundColor: healthColor(h.healthScore) }}
-          />
-        </div>
-      </div>
-    </button>
+      )}
+    </div>
   );
 }
 
 // ─── Desktop table row ────────────────────────────────────────────────────────
 
-function TableRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void }) {
+function TableRow({ h, onOpen, prices, onAction }: { h: Holding; onOpen: (h: Holding) => void; prices: Map<string, number>; onAction: (h: Holding, action: DecisionAction) => void }) {
   const sector     = resolvedSector(h);
-  const pnlPct     = h.currentPrice && h.costPrice ? ((h.currentPrice - h.costPrice) / h.costPrice) * 100 : null;
   const amountWan  = (h.costPrice * h.shares) / 10_000;
   const noExit     = h.exitConditions.length === 0 && h.status === "HOLDING";
   const accent     = STATUS_ACCENT[h.status] ?? "var(--border-subtle)";
@@ -151,11 +286,10 @@ function TableRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void }) {
           <span className="inline-block w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: accent }} />
           <span className="font-medium text-sm" style={{ color: "var(--foreground)" }}>{h.stockName}</span>
           <span className="text-xs font-mono" style={{ color: "var(--muted-foreground)" }}>{h.stockCode}</span>
+          <SignalBadge stockCode={h.stockCode} />
           {noExit && (
-            <span
-              className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md font-medium"
-              style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "var(--brand-warning)" }}
-            >
+            <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+              style={{ backgroundColor: "rgba(245,158,11,0.1)", color: "var(--brand-warning)" }}>
               <AlertTriangle size={9} /> 无止损
             </span>
           )}
@@ -163,12 +297,10 @@ function TableRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void }) {
       </td>
 
       {/* 板块 */}
-      <td className="py-3 px-2">
+      <td className="py-3 px-2 hidden lg:table-cell">
         {sector ? (
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded-md"
-            style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}
-          >
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+            style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}>
             {sector}
           </span>
         ) : (
@@ -186,31 +318,21 @@ function TableRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void }) {
         ) : <span className="text-xs opacity-40" style={{ color: "var(--muted-foreground)" }}>已清仓</span>}
       </td>
 
-      {/* 持仓市值 */}
-      <td className="py-3 px-2 text-sm tabular-nums">
-        {h.shares > 0 && amountWan >= 0.01 ? (
-          <div>
-            <div style={{ color: "var(--foreground)" }}>¥{amountWan.toFixed(1)} 万</div>
-            {pnlPct !== null && (
-              <div
-                className="text-xs font-semibold"
-                style={{ color: pnlPct >= 0 ? "var(--color-up)" : "var(--color-down)" }}
-              >
-                {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
-              </div>
-            )}
-          </div>
-        ) : <span className="text-xs opacity-40" style={{ color: "var(--muted-foreground)" }}>—</span>}
+      {/* 持仓天数 */}
+      <td className="py-3 px-2 text-sm tabular-nums hidden md:table-cell">
+        <DaysBadge h={h} />
+      </td>
+
+      {/* 盈亏 */}
+      <td className="py-3 px-2">
+        <PnlDisplay h={h} prices={prices} showAmount />
       </td>
 
       {/* 健康度 */}
-      <td className="py-3 px-2">
+      <td className="py-3 px-2 hidden lg:table-cell">
         <div className="flex items-center gap-2 min-w-[80px]">
           <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--surface-overlay)" }}>
-            <div
-              className="h-full rounded-full"
-              style={{ width: `${h.healthScore}%`, backgroundColor: healthColor(h.healthScore) }}
-            />
+            <div className="h-full rounded-full" style={{ width: `${h.healthScore}%`, backgroundColor: healthColor(h.healthScore) }} />
           </div>
           <span className="text-xs font-medium tabular-nums w-7 text-right" style={{ color: healthColor(h.healthScore) }}>
             {h.healthScore}
@@ -218,14 +340,9 @@ function TableRow({ h, onOpen }: { h: Holding; onOpen: (h: Holding) => void }) {
         </div>
       </td>
 
-      {/* 状态 */}
+      {/* 操作 */}
       <td className="py-3 pl-2 pr-4">
-        <span
-          className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-          style={{ color: STATUS_COLORS[h.status], backgroundColor: `${STATUS_COLORS[h.status]}1A` }}
-        >
-          {STATUS_LABELS[h.status]}
-        </span>
+        <ActionButtons h={h} onAction={onAction} />
       </td>
     </tr>
   );
@@ -281,17 +398,14 @@ function InferredRow({ h, onClaimed }: { h: Holding; onClaimed: (holding: Holdin
           <span className="font-semibold text-sm" style={{ color: "var(--foreground)" }}>{h.stockName}</span>
           <span className="text-xs font-mono" style={{ color: "var(--muted-foreground)" }}>{h.stockCode}</span>
           {sector && (
-            <span
-              className="text-[10px] px-1.5 py-0.5 rounded-md"
-              style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}
-            >
+            <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+              style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}>
               {sector}
             </span>
           )}
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded-md"
-            style={{ backgroundColor: "rgba(61,142,248,0.1)", color: "var(--brand-blue)" }}
-          >
+          <DaysBadge h={h} />
+          <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+            style={{ backgroundColor: "rgba(61,142,248,0.1)", color: "var(--brand-blue)" }}>
             从决策卡聚合
           </span>
         </div>
@@ -335,17 +449,27 @@ type Props = {
 
 export function HoldingsList({ holdings, inferred }: Props) {
   const router = useRouter();
-  const [statusFilter, setStatusFilter] = useState<HoldingStatus | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<HoldingStatus>("HOLDING");
   const [sheetOpen, setSheetOpen]       = useState(false);
   const [sheetMode, setSheetMode]       = useState<HoldingSheetMode>({ type: "new" });
+  const [decisionDrawer, setDecisionDrawer] = useState<DecisionDrawerState>(DECISION_DRAWER_CLOSED);
 
-  const filtered = statusFilter === "ALL"
-    ? holdings
-    : holdings.filter((h) => h.status === statusFilter);
+  // Batch fetch realtime prices for all holding stocks
+  const allStocks = useMemo(
+    () => [...holdings, ...inferred]
+      .filter((h) => h.shares > 0)
+      .map((h) => ({ stockCode: h.stockCode, stockMarket: h.stockMarket })),
+    [holdings, inferred]
+  );
+  const prices = useStockPrices(allStocks);
+
+  const allItems = [...holdings, ...inferred.filter((h) => h.status === statusFilter)];
+  const filtered = allItems.filter((h) => h.status === statusFilter);
 
   const noExit = holdings.filter((h) => h.status === "HOLDING" && h.exitConditions.length === 0).length;
 
   const openDetail = useCallback((h: Holding) => {
+    if (h.inferred) return; // inferred holdings open via claim
     setSheetMode({ type: "detail", holding: h });
     setSheetOpen(true);
   }, []);
@@ -360,17 +484,30 @@ export function HoldingsList({ holdings, inferred }: Props) {
     router.refresh();
   }, [router]);
 
-  // After creating a new holding → switch sheet to detail mode
   const handleCreated = useCallback((holding: Holding) => {
     setSheetMode({ type: "detail", holding });
     router.refresh();
   }, [router]);
 
-  // After claiming an inferred holding → open its detail sheet
   const handleClaimed = useCallback((holding: Holding) => {
     setSheetMode({ type: "detail", holding });
     setSheetOpen(true);
   }, []);
+
+  const openDecisionDrawer = useCallback((h: Holding, action: DecisionAction) => {
+    setDecisionDrawer({
+      open: true,
+      stockCode: h.stockCode,
+      stockName: h.stockName,
+      stockMarket: h.stockMarket,
+      action,
+    });
+  }, []);
+
+  const closeDecisionDrawer = useCallback(() => {
+    setDecisionDrawer(DECISION_DRAWER_CLOSED);
+    router.refresh();
+  }, [router]);
 
   const activeCount = holdings.filter((h) => h.status !== "CLOSED").length;
   const hasAny = holdings.length > 0 || inferred.length > 0;
@@ -444,9 +581,7 @@ export function HoldingsList({ holdings, inferred }: Props) {
       {hasAny && (
         <div className="flex items-center gap-1.5 flex-wrap">
           {STATUS_FILTERS.map((f) => {
-            const count = f.value === "ALL"
-              ? holdings.length
-              : holdings.filter((h) => h.status === f.value).length;
+            const count = [...holdings, ...inferred].filter((h) => h.status === f.value).length;
             const isActive = statusFilter === f.value;
             return (
               <button
@@ -484,12 +619,16 @@ export function HoldingsList({ holdings, inferred }: Props) {
       {/* ── Mobile cards ──────────────────────────────────────────────────── */}
       {filtered.length > 0 && (
         <div className="sm:hidden space-y-2">
-          {filtered.map((h) => <HoldingRow key={h.id} h={h} onOpen={openDetail} />)}
+          {filtered.map((h) =>
+            h.inferred
+              ? <InferredRow key={h.stockCode} h={h} onClaimed={handleClaimed} />
+              : <HoldingRow key={h.id} h={h} onOpen={openDetail} prices={prices} onAction={openDecisionDrawer} />
+          )}
         </div>
       )}
 
       {/* ── Desktop table ─────────────────────────────────────────────────── */}
-      {filtered.length > 0 && (
+      {filtered.filter((h) => !h.inferred).length > 0 && (
         <div
           className="hidden sm:block rounded-xl border overflow-hidden"
           style={{ borderColor: "var(--border-subtle)", backgroundColor: "var(--surface-card)" }}
@@ -498,30 +637,29 @@ export function HoldingsList({ holdings, inferred }: Props) {
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border-subtle)", backgroundColor: "var(--surface-overlay)" }}>
                 <th className="py-2.5 pl-4 pr-2 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>股票</th>
-                <th className="py-2.5 px-2 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>板块</th>
+                <th className="py-2.5 px-2 text-xs font-medium hidden lg:table-cell" style={{ color: "var(--muted-foreground)" }}>板块</th>
                 <th className="py-2.5 px-2 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>成本 × 股数</th>
-                <th className="py-2.5 px-2 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>持仓市值</th>
-                <th className="py-2.5 px-2 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>健康度</th>
-                <th className="py-2.5 pl-2 pr-4 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>状态</th>
+                <th className="py-2.5 px-2 text-xs font-medium hidden md:table-cell" style={{ color: "var(--muted-foreground)" }}>持仓天数</th>
+                <th className="py-2.5 px-2 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>盈亏</th>
+                <th className="py-2.5 px-2 text-xs font-medium hidden lg:table-cell" style={{ color: "var(--muted-foreground)" }}>健康度</th>
+                <th className="py-2.5 pl-2 pr-4 text-xs font-medium" style={{ color: "var(--muted-foreground)" }}>操作</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((h) => <TableRow key={h.id} h={h} onOpen={openDetail} />)}
+              {filtered.filter((h) => !h.inferred).map((h) => <TableRow key={h.id} h={h} onOpen={openDetail} prices={prices} onAction={openDecisionDrawer} />)}
             </tbody>
           </table>
         </div>
       )}
 
-      {/* ── Inferred holdings ─────────────────────────────────────────────── */}
-      {inferred.length > 0 && (
-        <div className="space-y-2">
-          <p
-            className="text-xs font-medium uppercase tracking-wider"
-            style={{ color: "var(--muted-foreground)" }}
-          >
+      {/* ── Inferred holdings (desktop) ──────────────────────────────────── */}
+      {filtered.filter((h) => h.inferred).length > 0 && (
+        <div className="hidden sm:block space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider"
+            style={{ color: "var(--muted-foreground)" }}>
             从决策卡聚合（尚未建档）
           </p>
-          {inferred.map((h) => (
+          {filtered.filter((h) => h.inferred).map((h) => (
             <InferredRow key={h.stockCode} h={h} onClaimed={handleClaimed} />
           ))}
         </div>
@@ -533,6 +671,12 @@ export function HoldingsList({ holdings, inferred }: Props) {
         mode={sheetMode}
         onClose={handleClose}
         onCreated={handleCreated}
+      />
+
+      {/* 决策卡抽屉 */}
+      <DecisionDrawer
+        state={decisionDrawer}
+        onClose={closeDecisionDrawer}
       />
     </>
   );

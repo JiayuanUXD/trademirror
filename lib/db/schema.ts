@@ -180,6 +180,30 @@ export const decisions = sqliteTable("decisions", {
   userId: text("user_id").notNull(),
 });
 
+export const dailyDigests = sqliteTable("daily_digests", {
+  id: text("id").primaryKey(),
+  tradeDate: text("trade_date").notNull(),       // YYYYMMDD
+  marketData: text("market_data").notNull(),      // JSON: 三大指数数据
+  stockAnalyses: text("stock_analyses").notNull(),// JSON: [{stockCode, indicators, signals}]
+  digestText: text("digest_text").notNull(),      // AI 生成的完整分析文本
+  generatedAt: integer("generated_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+  userId: text("user_id").notNull(),
+}, (table) => ({
+  tradeDateUserUnique: uniqueIndex("idx_daily_digests_date_user").on(table.tradeDate, table.userId),
+}));
+
+export const digestShares = sqliteTable("digest_shares", {
+  token: text("token").primaryKey(),             // 随机短 token (nanoid 12位)
+  tradeDate: text("trade_date").notNull(),
+  marketData: text("market_data").notNull(),
+  stockAnalyses: text("stock_analyses").notNull(),
+  digestText: text("digest_text").notNull(),
+  createdAt: integer("created_at").notNull(),
+  expiresAt: integer("expires_at"),              // null = 永不过期
+  userId: text("user_id").notNull(),
+});
+
 export const settings = sqliteTable("settings", {
   id: text("id").primaryKey(),
   displayName: text("display_name").notNull().default(""),

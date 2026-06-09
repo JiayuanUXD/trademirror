@@ -9,6 +9,33 @@
 
 ---
 
+## 2026-06-09
+
+### 决策卡抽屉模式（持仓库 + 决策卡页）
+
+- 持仓库、持仓详情、决策卡列表三处的"加仓/卖出/减仓/清仓"操作，统一从页面跳转改为右侧抽屉弹出
+- `DecisionDrawer` 组件（Portal + ESC 关闭 + 滚动锁定），传入 `initialValues` 自动填入股票信息
+- 股票字段在抽屉模式下显示为只读锁定态，跳过 `StockCombobox` 搜索
+- `DecisionDrawerState` 增加 `parentId` 字段，新建的关联决策卡自动挂载父决策
+- 抽屉打开时自动调用 `/api/stocks/price` 获取实时市价填入价格字段（此前仅搜索选股时触发）
+
+### 盘后简报 AI 文本清理
+
+- 新增 `BOILERPLATE_PATTERNS`：过滤"好的，以下是..."、"盘后分析简报"、"大盘环境总结："等 AI 套话
+- 新增 `NARRATIVE_NOISE_PATTERNS`：过滤个股叙事中的"技术面解读："、"技术分析："等冗余标题
+- 个股卡片 AI 叙事和明日关注区块默认单行截断（`line-clamp-1`），底部"展开/收起"按钮切换
+- 移除"技术分析"和"明日展望"的 section 标题，内容直接展示
+
+### 盘后简报分享功能
+
+- 新增 `digest_shares` 表（schema + DDL + 查询函数），token 使用 `crypto.randomBytes(8)` 生成 base64url 短链
+- `POST /api/digest/share`：创建分享快照，同日同用户复用已有 token
+- `/s/[token]` 公开页面：无需登录，展示完整简报内容 + 免责声明 + "了解 TradeMirror" 入口
+- Middleware 增加 `/s/` 路径白名单，跳过认证检查
+- 盘后简报详情页标题右侧新增"分享"按钮，点击生成短链并自动复制到剪贴板
+
+---
+
 ## 2026-06-08
 
 ### 决策卡搜索功能

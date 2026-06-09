@@ -12,33 +12,39 @@ export async function GET(req: NextRequest) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
-    async start(controller) {
-      let closed = false;
+    start(controller) {
+      let timer: ReturnType<typeof setInterval> | null = null;
 
-      const sendUpdate = async () => {
-        if (closed) return;
+      // 唯一安全的写入方式：所有 enqueue 都 try-catch
+      function safeEnqueue(data: string) {
         try {
-          const stats = await getAlertStats(userId);
-          // Re-check after await: connection may have closed while DB query ran
-          if (closed) return;
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(stats)}\n\n`));
-        } catch (e) {
-          console.error("SSE Update Error:", e);
-        }
-      };
-
-      await sendUpdate();
-
-      const interval = setInterval(() => { void sendUpdate(); }, 10000);
-
-      req.signal.addEventListener("abort", () => {
-        closed = true;
-        clearInterval(interval);
-        try {
-          controller.close();
+          controller.enqueue(encoder.encode(data));
+          return true;
         } catch {
-          // Controller may already be closed or errored — safe to ignore
+          // Controller already closed — stop everything
+          if (timer) { clearInterval(timer); timer = null; }
+          return false;
         }
+      }
+
+      async function tick() {
+        try {
+          const stats = await getAlertStats(userId!);
+          safeEnqueue(`data: ${JSON.stringify(stats)}\n\n`);
+        } catch {
+          // DB error or controller closed — just skip this tick
+        }
+      }
+
+      // 首次推送
+      void tick();
+
+      // 定时推送
+      timer = setInterval(() => { void tick(); }, 10_000);
+
+      // 客户端断开
+      req.signal.addEventListener("abort", () => {
+        if (timer) { clearInterval(timer); timer = null; }
       });
     },
   });

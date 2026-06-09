@@ -71,6 +71,8 @@ export type Holding = {
   healthScore: number;
   createdAt: number;
   updatedAt: number;
+  /** 首次买入时间（毫秒时间戳），用于计算持仓天数 */
+  firstBuyAt?: number;
   /**
    * true = 由决策卡自动聚合而来，尚未在 holdings 表建立正式档案。
    * 此类持仓只读，需用户点击「建档」后方可编辑逻辑/前提/撤退条件。

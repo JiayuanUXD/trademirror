@@ -21,6 +21,7 @@ type DecisionRow = {
   quantity: number;
   status: string;
   createdAt: number;
+  tradedAt: number | null;
 };
 
 /**
@@ -114,6 +115,7 @@ export async function getHoldings(userId: string): Promise<Holding[]> {
         quantity: decisions.quantity,
         status: decisions.status,
         createdAt: decisions.createdAt,
+        tradedAt: decisions.tradedAt,
       })
       .from(decisions)
       .where(eq(decisions.userId, userId)),
@@ -126,6 +128,15 @@ export async function getHoldings(userId: string): Promise<Holding[]> {
     decisionsByStock.get(d.stockCode)!.push(d);
   }
 
+  // Helper: find the earliest BUY/ADD time for a stock
+  function getFirstBuyAt(stockDecisions: DecisionRow[]): number | undefined {
+    const buys = stockDecisions
+      .filter((d) => d.status !== "VOIDED" && (d.action === "BUY" || d.action === "ADD"))
+      .sort((a, b) => a.createdAt - b.createdAt);
+    if (buys.length === 0) return undefined;
+    return buys[0].tradedAt ?? buys[0].createdAt;
+  }
+
   // ── Real holdings (have a profile record) ──────────────────────────────
   const existingCodes = new Set(holdingRows.map((r) => r.stockCode));
   const result: Holding[] = holdingRows.map((row) => {
@@ -133,7 +144,9 @@ export async function getHoldings(userId: string): Promise<Holding[]> {
     const { shares, costPrice } = computePosition(stockDecisions);
     const hasDecisions = stockDecisions.some((d) => d.status !== "VOIDED");
     const status = deriveStatus(shares, hasDecisions, row.status);
-    return rowToHolding(row, { shares, costPrice, status });
+    const h = rowToHolding(row, { shares, costPrice, status });
+    h.firstBuyAt = getFirstBuyAt(stockDecisions);
+    return h;
   });
 
   // ── Inferred holdings (decisions exist but no profile) ─────────────────
@@ -171,6 +184,7 @@ export async function getHoldings(userId: string): Promise<Holding[]> {
       healthScore: 0,
       createdAt: ref.createdAt,
       updatedAt: ref.createdAt,
+      firstBuyAt: getFirstBuyAt(stockDecisions),
       inferred: true,
     });
   }
@@ -206,6 +220,7 @@ export async function getHoldingById(id: string, userId: string): Promise<Holdin
       quantity: decisions.quantity,
       status: decisions.status,
       createdAt: decisions.createdAt,
+      tradedAt: decisions.tradedAt,
     })
     .from(decisions)
     .where(and(eq(decisions.stockCode, row.stockCode), eq(decisions.userId, userId)));

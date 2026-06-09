@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,6 +13,7 @@ import type { Decision, VoidedReason } from "@/types/decision";
 import { VOIDED_REASON_LABELS } from "@/types/decision";
 import { DecisionSheet } from "./decision-sheet";
 import { ImportVisionModal } from "./import-vision-modal";
+import { DecisionDrawer, DECISION_DRAWER_CLOSED, type DecisionDrawerState } from "@/components/holdings/decision-drawer";
 import dayjs from "dayjs";
 
 const ACTION_COLORS: Record<DecisionAction, string> = {
@@ -40,6 +42,25 @@ export function DecisionsList({ decisions }: Props) {
   const [showImportModal, setShowImportModal] = useState(false);
   // Tracks which row's "更多" dropdown is open
   const [openMoreId, setOpenMoreId] = useState<string | null>(null);
+  // Decision drawer state
+  const [drawer, setDrawer] = useState<DecisionDrawerState>(DECISION_DRAWER_CLOSED);
+
+  const openDrawer = useCallback((d: Decision, action: DecisionAction) => {
+    setDrawer({
+      open: true,
+      stockCode: d.stockCode,
+      stockName: d.stockName,
+      stockMarket: d.stockMarket,
+      action,
+      parentId: d.id,
+    });
+    setOpenMoreId(null);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawer(DECISION_DRAWER_CLOSED);
+    router.refresh();
+  }, [router]);
 
   const filtered = decisions.filter((d) => {
     if (statusFilter !== "ALL" && d.status !== statusFilter) return false;
@@ -171,6 +192,7 @@ export function DecisionsList({ decisions }: Props) {
                 onSelect={setSelectedId}
                 onComplete={(id) => { setSelectedId(id); setOpenForComplete(true); }}
                 onActionDone={handleActionDone}
+                onOpenDrawer={openDrawer}
               />
             ))}
           </div>
@@ -200,6 +222,7 @@ export function DecisionsList({ decisions }: Props) {
                     onSelect={setSelectedId}
                     onComplete={(id) => { setSelectedId(id); setOpenForComplete(true); }}
                     onActionDone={handleActionDone}
+                    onOpenDrawer={openDrawer}
                     moreOpen={openMoreId === d.id}
                     onMoreToggle={(open) => setOpenMoreId(open ? d.id : null)}
                   />
@@ -221,6 +244,7 @@ export function DecisionsList({ decisions }: Props) {
       {showImportModal && (
         <ImportVisionModal onClose={() => { setShowImportModal(false); router.refresh(); }} />
       )}
+      <DecisionDrawer state={drawer} onClose={closeDrawer} />
     </>
   );
 }
@@ -255,6 +279,7 @@ type ActionCallbacks = {
   /** Called when opening via the "补全" button — sheet should auto-expand the form. */
   onComplete?: (id: string) => void;
   onActionDone: () => void;
+  onOpenDrawer: (d: Decision, action: DecisionAction) => void;
 };
 
 async function doArchive(id: string): Promise<boolean> {
@@ -272,28 +297,52 @@ async function doVoid(id: string, reason: VoidedReason): Promise<boolean> {
 }
 
 // Dropdown menu for secondary actions (作废 / 归档 etc.)
+// Uses Portal to render outside overflow-hidden containers.
 function MoreMenu({
   d,
   onClose,
   onSelect,
   onActionDone,
-}: { d: Decision; onClose: () => void } & ActionCallbacks) {
+  onOpenDrawer,
+  triggerRef,
+}: { d: Decision; onClose: () => void; triggerRef: React.RefObject<HTMLElement | null> } & ActionCallbacks) {
   const ref = useRef<HTMLDivElement>(null);
   const [voidStep, setVoidStep] = useState(false);
   const [voidReason, setVoidReason] = useState<VoidedReason>("INPUT_ERROR");
   const [loading, setLoading] = useState<string | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number }>({ right: 0 });
 
   const minutesSince = Math.floor((Date.now() - d.createdAt) / 60_000);
   const canVoidFree = minutesSince <= 30;
   const isBuy = d.action === "BUY" || d.action === "ADD";
 
+  // Compute position relative to trigger button
+  useLayoutEffect(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    const menuHeight = voidStep ? 280 : isBuy ? 240 : 120;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const rightOffset = window.innerWidth - rect.right;
+
+    if (spaceBelow < menuHeight + 8) {
+      // Not enough space below: open upward
+      setPos({ bottom: window.innerHeight - rect.top + 4, right: rightOffset });
+    } else {
+      setPos({ top: rect.bottom + 4, right: rightOffset });
+    }
+  }, [triggerRef, voidStep, isBuy]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)
+          && triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+        onClose();
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [onClose]);
+  }, [onClose, triggerRef]);
 
   function stop(e: React.MouseEvent) { e.stopPropagation(); }
 
@@ -323,10 +372,10 @@ function MoreMenu({
   }
 
   const menuStyle: React.CSSProperties = {
-    position: "absolute",
-    right: 0,
-    top: "calc(100% + 4px)",
-    zIndex: 50,
+    position: "fixed",
+    right: pos.right,
+    ...(pos.bottom != null ? { bottom: pos.bottom } : { top: pos.top }),
+    zIndex: 9999,
     minWidth: 160,
     backgroundColor: "var(--surface-card)",
     border: "1px solid var(--border-subtle)",
@@ -338,7 +387,7 @@ function MoreMenu({
   const itemBase = "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors text-left";
   const itemStyle = { color: "var(--foreground)" };
 
-  return (
+  const menu = (
     <div ref={ref} style={menuStyle} onClick={stop}>
       {voidStep ? (
         <div className="space-y-2 p-1">
@@ -366,18 +415,20 @@ function MoreMenu({
           {/* Navigation actions */}
           {isBuy && (
             <>
-              <Link href={`/decisions/new?parentId=${d.id}&stockCode=${d.stockCode}&stockName=${encodeURIComponent(d.stockName)}&stockMarket=${d.stockMarket}&action=REDUCE`}
+              <button type="button"
                 className={itemBase} style={itemStyle}
+                onClick={(e) => { stop(e); onOpenDrawer(d, "REDUCE"); onClose(); }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "var(--surface-overlay)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}>
                 <TrendingDown size={13} style={{ color: "var(--color-down)" }} /> 减仓
-              </Link>
-              <Link href={`/decisions/new?parentId=${d.id}&stockCode=${d.stockCode}&stockName=${encodeURIComponent(d.stockName)}&stockMarket=${d.stockMarket}&action=CLEAR`}
+              </button>
+              <button type="button"
                 className={itemBase} style={itemStyle}
+                onClick={(e) => { stop(e); onOpenDrawer(d, "CLEAR"); onClose(); }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "var(--surface-overlay)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}>
                 <TrendingDown size={13} style={{ color: "var(--color-down)" }} /> 清仓
-              </Link>
+              </button>
               <div style={{ height: 1, backgroundColor: "var(--border-subtle)", margin: "4px 0" }} />
             </>
           )}
@@ -399,6 +450,8 @@ function MoreMenu({
       )}
     </div>
   );
+
+  return createPortal(menu, document.body);
 }
 
 // The operations cell for desktop table rows
@@ -409,10 +462,12 @@ function OperationsCell({
   onSelect,
   onComplete,
   onActionDone,
+  onOpenDrawer,
 }: { d: Decision; moreOpen: boolean; onMoreToggle: (open: boolean) => void } & ActionCallbacks) {
   const isActive = d.status === "ACTIVE";
   const isIncomplete = d.incomplete && isActive;
   const isBuy = d.action === "BUY" || d.action === "ADD";
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
 
   function stop(e: React.MouseEvent) { e.stopPropagation(); }
 
@@ -428,7 +483,7 @@ function OperationsCell({
 
   return (
     <td className="px-4 py-3" onClick={stop}>
-      <div className="flex items-center gap-1.5 relative">
+      <div className="flex items-center gap-1.5">
         {/* Primary: 补全 */}
         {isIncomplete && (
           <button type="button"
@@ -441,37 +496,37 @@ function OperationsCell({
 
         {/* Primary: 加仓 (BUY/ADD active non-incomplete) */}
         {isBuy && !isIncomplete && (
-          <Link
-            href={`/decisions/new?parentId=${d.id}&stockCode=${d.stockCode}&stockName=${encodeURIComponent(d.stockName)}&stockMarket=${d.stockMarket}&action=ADD`}
+          <button type="button"
             className={btnBase}
             style={{ backgroundColor: "rgba(var(--color-up-rgb, 239,68,68),0.08)", color: "var(--color-up)", border: "1px solid rgba(var(--color-up-rgb,239,68,68),0.2)" }}
-            onClick={stop}>
+            onClick={(e) => { stop(e); onOpenDrawer(d, "ADD"); }}>
             <TrendingUp size={11} /> 加仓
-          </Link>
+          </button>
         )}
 
         {/* Secondary: 更多 */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={(e) => { stop(e); onMoreToggle(!moreOpen); }}
-            className="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors"
-            style={{
-              backgroundColor: moreOpen ? "var(--surface-overlay)" : "transparent",
-              color: "var(--muted-foreground)",
-              border: "1px solid var(--border-subtle)",
-            }}>
-            <MoreHorizontal size={13} />
-          </button>
-          {moreOpen && (
-            <MoreMenu
-              d={d}
-              onClose={() => onMoreToggle(false)}
-              onSelect={onSelect}
-              onActionDone={onActionDone}
-            />
-          )}
-        </div>
+        <button
+          ref={moreBtnRef}
+          type="button"
+          onClick={(e) => { stop(e); onMoreToggle(!moreOpen); }}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors"
+          style={{
+            backgroundColor: moreOpen ? "var(--surface-overlay)" : "transparent",
+            color: "var(--muted-foreground)",
+            border: "1px solid var(--border-subtle)",
+          }}>
+          <MoreHorizontal size={13} />
+        </button>
+        {moreOpen && (
+          <MoreMenu
+            d={d}
+            onClose={() => onMoreToggle(false)}
+            onSelect={onSelect}
+            onActionDone={onActionDone}
+            onOpenDrawer={onOpenDrawer}
+            triggerRef={moreBtnRef}
+          />
+        )}
       </div>
     </td>
   );
@@ -486,7 +541,7 @@ type RowProps = {
   onMoreToggle: (open: boolean) => void;
 } & ActionCallbacks;
 
-function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onComplete, onActionDone }: RowProps) {
+function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onComplete, onActionDone, onOpenDrawer }: RowProps) {
   const isVoided   = d.status === "VOIDED";
   const isArchived = d.status === "ARCHIVED";
   const isIncomplete = d.incomplete && d.status === "ACTIVE";
@@ -599,6 +654,7 @@ function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onComplete, 
         onSelect={onSelect}
         onComplete={onComplete}
         onActionDone={onActionDone}
+        onOpenDrawer={onOpenDrawer}
       />
     </tr>
   );
@@ -606,8 +662,9 @@ function DecisionRow({ d, isLast, moreOpen, onMoreToggle, onSelect, onComplete, 
 
 // ── Mobile card ─────────────────────────────────────────────────────────────
 
-function DecisionCard({ d, onSelect, onComplete, onActionDone }: { d: Decision } & ActionCallbacks) {
+function DecisionCard({ d, onSelect, onComplete, onActionDone, onOpenDrawer }: { d: Decision } & ActionCallbacks) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
   const color = ACTION_COLORS[d.action];
   const hasDanger = d.dangerSignals.length > 0;
   const hasResult = d.return30Days !== null;
@@ -698,16 +755,16 @@ function DecisionCard({ d, onSelect, onComplete, onActionDone }: { d: Decision }
             </button>
           )}
           {isBuy && !isIncomplete && (
-            <Link href={`/decisions/new?parentId=${d.id}&stockCode=${d.stockCode}&stockName=${encodeURIComponent(d.stockName)}&stockMarket=${d.stockMarket}&action=ADD`}
+            <button type="button" onClick={() => onOpenDrawer(d, "ADD")}
               className={btnBase}
               style={{ backgroundColor: `${color}12`, color, border: `1px solid ${color}30` }}>
               <TrendingUp size={11} /> 加仓
-            </Link>
+            </button>
           )}
 
           {/* 更多 */}
-          <div className="relative ml-auto">
-            <button type="button" onClick={() => setMoreOpen((v) => !v)}
+          <div className="ml-auto">
+            <button ref={moreBtnRef} type="button" onClick={() => setMoreOpen((v) => !v)}
               className={btnBase}
               style={{ backgroundColor: moreOpen ? "var(--surface-card)" : "transparent", color: "var(--muted-foreground)", border: "1px solid var(--border-subtle)" }}>
               <MoreHorizontal size={11} /> 更多
@@ -718,6 +775,8 @@ function DecisionCard({ d, onSelect, onComplete, onActionDone }: { d: Decision }
                 onClose={() => setMoreOpen(false)}
                 onSelect={onSelect}
                 onActionDone={onActionDone}
+                onOpenDrawer={onOpenDrawer}
+                triggerRef={moreBtnRef}
               />
             )}
           </div>

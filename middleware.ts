@@ -7,11 +7,15 @@ export default auth((req) => {
   const role = req.auth?.user?.role;
   const mustChangePassword = req.auth?.user?.mustChangePassword;
 
-  // Public paths that don't need auth
-  const publicPaths = ["/login", "/register"];
-  if (publicPaths.includes(pathname)) {
+  // Share pages — always accessible, no redirect
+  if (pathname.startsWith("/s/")) {
+    return NextResponse.next();
+  }
+
+  // Auth pages (login/register) — redirect to home if already logged in
+  const authPaths = ["/login", "/register"];
+  if (authPaths.includes(pathname)) {
     if (isLoggedIn) {
-      // If must change password, let them go to change-password, not home
       if (mustChangePassword) {
         return NextResponse.redirect(new URL("/change-password", req.nextUrl));
       }

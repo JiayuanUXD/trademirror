@@ -52,7 +52,20 @@ const MARKET_OPTIONS: { value: "SH" | "SZ" | "BJ"; label: string }[] = [
   { value: "BJ", label: "北" },
 ];
 
-export function DecisionForm() {
+export type DecisionFormProps = {
+  /** 预填充值（抽屉模式传入，优先级高于 URL params） */
+  initialValues?: {
+    stockCode?: string;
+    stockName?: string;
+    stockMarket?: "SH" | "SZ" | "BJ";
+    action?: DecisionAction;
+    parentId?: string;
+  };
+  /** 提交成功回调（抽屉模式用，替代路由跳转） */
+  onSuccess?: () => void;
+};
+
+export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
@@ -74,8 +87,30 @@ export function DecisionForm() {
       .catch(() => {});
   }, []);
 
-  // Pre-fill from URL params (child card)
+  // Pre-fill from props (drawer mode) or URL params (page mode)
   useEffect(() => {
+    if (initialValues) {
+      const { stockCode, stockName, stockMarket, action, parentId: pId } = initialValues;
+      if (stockCode && stockName && stockMarket) {
+        setS1((p) => ({ ...p, stockCode, stockName, stockMarket }));
+        // Auto-fetch current price for drawer mode
+        fetch(`/api/stocks/price?code=${stockCode}&market=${stockMarket}`)
+          .then((r) => r.ok ? r.json() : null)
+          .then((data: unknown) => {
+            const d = data as { price?: number } | null;
+            if (d?.price) {
+              setS1((p) => ({ ...p, price: d.price!.toFixed(2) }));
+            }
+          })
+          .catch(() => {});
+      }
+      if (action && Object.keys(ACTION_LABELS).includes(action)) {
+        setS1((p) => ({ ...p, action }));
+      }
+      if (pId) setParentId(pId);
+      return; // props 优先，忽略 URL
+    }
+
     const pId = searchParams.get("parentId");
     const stockCode = searchParams.get("stockCode");
     const stockName = searchParams.get("stockName");
@@ -85,11 +120,21 @@ export function DecisionForm() {
     if (pId) setParentId(pId);
     if (stockCode && stockName && stockMarket) {
       setS1((p) => ({ ...p, stockCode, stockName, stockMarket }));
+      // Auto-fetch current price for URL params mode
+      fetch(`/api/stocks/price?code=${stockCode}&market=${stockMarket}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((data: unknown) => {
+          const d = data as { price?: number } | null;
+          if (d?.price) {
+            setS1((p) => ({ ...p, price: d.price!.toFixed(2) }));
+          }
+        })
+        .catch(() => {});
     }
     if (action && Object.keys(ACTION_LABELS).includes(action)) {
       setS1((p) => ({ ...p, action }));
     }
-  }, [searchParams]);
+  }, [searchParams, initialValues]);
 
   const [s1, setS1] = useState<Step1State>({
     stockCode: "",
@@ -251,7 +296,11 @@ export function DecisionForm() {
         throw new Error(data.error ?? "提交失败");
       }
 
-      router.push("/decisions");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/decisions");
+      }
       router.refresh();
     } catch (err) {
       setErrors({ submit: err instanceof Error ? err.message : "提交失败，请重试" });
@@ -399,52 +448,73 @@ export function DecisionForm() {
             </div>
           )}
 
-          {/* Stock search */}
+          {/* Stock search / locked display */}
           <div className="space-y-1">
-            <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              股票（输入代码或名称搜索）
-            </label>
-            <StockCombobox
-              initialCode={s1.stockCode}
-              initialName={s1.stockName}
-              onSelect={async (stock: StockItem) => {
-                setS1((p) => ({
-                  ...p,
-                  stockCode: stock.code,
-                  stockName: stock.name,
-                  stockMarket: stock.market,
-                }));
-                clearError("stockCode");
-                clearError("stockName");
-
-                // Auto-fetch current price
-                try {
-                  const res = await fetch(`/api/stocks/price?code=${stock.code}&market=${stock.market}`);
-                  if (res.ok) {
-                    const data = await res.json() as { price?: number };
-                    if (data.price) {
-                      setS1((p) => ({ ...p, price: data.price!.toFixed(2) }));
-                    }
-                  }
-                } catch { /* Silently fail — user can type price manually */ }
-              }}
-            />
-            {(errors.stockCode || errors.stockName) && (
-              <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>
-                {errors.stockCode || errors.stockName}
-              </p>
-            )}
-            {s1.stockCode && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs font-mono" style={{ color: "var(--brand-blue)" }}>{s1.stockCode}</span>
-                <span className="text-xs" style={{ color: "var(--foreground)" }}>{s1.stockName}</span>
-                <span
-                  className="text-[10px] px-1.5 py-0.5 rounded font-medium"
-                  style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "var(--muted-foreground)" }}
+            {initialValues?.stockCode ? (
+              <>
+                <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>股票</label>
+                <div
+                  className="flex items-center gap-2 h-9 px-3 rounded-md border"
+                  style={{ backgroundColor: "var(--surface-overlay)", borderColor: "var(--border-subtle)" }}
                 >
-                  {s1.stockMarket === "SH" ? "沪" : s1.stockMarket === "SZ" ? "深" : "北"}
-                </span>
-              </div>
+                  <span className="text-sm font-mono" style={{ color: "var(--brand-blue)" }}>{s1.stockCode}</span>
+                  <span className="text-sm" style={{ color: "var(--foreground)" }}>{s1.stockName}</span>
+                  <span
+                    className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                    style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "var(--muted-foreground)" }}
+                  >
+                    {s1.stockMarket === "SH" ? "沪" : s1.stockMarket === "SZ" ? "深" : "北"}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <>
+                <label className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  股票（输入代码或名称搜索）
+                </label>
+                <StockCombobox
+                  initialCode={s1.stockCode}
+                  initialName={s1.stockName}
+                  onSelect={async (stock: StockItem) => {
+                    setS1((p) => ({
+                      ...p,
+                      stockCode: stock.code,
+                      stockName: stock.name,
+                      stockMarket: stock.market,
+                    }));
+                    clearError("stockCode");
+                    clearError("stockName");
+
+                    // Auto-fetch current price
+                    try {
+                      const res = await fetch(`/api/stocks/price?code=${stock.code}&market=${stock.market}`);
+                      if (res.ok) {
+                        const data = await res.json() as { price?: number };
+                        if (data.price) {
+                          setS1((p) => ({ ...p, price: data.price!.toFixed(2) }));
+                        }
+                      }
+                    } catch { /* Silently fail — user can type price manually */ }
+                  }}
+                />
+                {(errors.stockCode || errors.stockName) && (
+                  <p className="text-[11px]" style={{ color: "var(--brand-red)" }}>
+                    {errors.stockCode || errors.stockName}
+                  </p>
+                )}
+                {s1.stockCode && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-mono" style={{ color: "var(--brand-blue)" }}>{s1.stockCode}</span>
+                    <span className="text-xs" style={{ color: "var(--foreground)" }}>{s1.stockName}</span>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                      style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "var(--muted-foreground)" }}
+                    >
+                      {s1.stockMarket === "SH" ? "沪" : s1.stockMarket === "SZ" ? "深" : "北"}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

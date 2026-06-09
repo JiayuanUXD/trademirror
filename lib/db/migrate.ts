@@ -154,6 +154,27 @@ const CREATE_TABLES = [
     occurred_at INTEGER NOT NULL,
     user_id TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS daily_digests (
+    id TEXT PRIMARY KEY,
+    trade_date TEXT NOT NULL,
+    market_data TEXT NOT NULL,
+    stock_analyses TEXT NOT NULL,
+    digest_text TEXT NOT NULL,
+    generated_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    UNIQUE(trade_date, user_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS digest_shares (
+    token TEXT PRIMARY KEY,
+    trade_date TEXT NOT NULL,
+    market_data TEXT NOT NULL,
+    stock_analyses TEXT NOT NULL,
+    digest_text TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER,
+    user_id TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS settings (
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL DEFAULT '',
@@ -182,6 +203,7 @@ const CREATE_INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_error_types_user ON error_types(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_error_logs_user ON error_logs(user_id)`,
   `CREATE INDEX IF NOT EXISTS idx_settings_user ON settings(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_daily_digests_user ON daily_digests(user_id)`,
 ];
 
 // ─── Migration: add userId to existing tables (for databases created before auth) ──

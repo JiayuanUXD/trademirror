@@ -20,6 +20,8 @@ import {
 } from "@/lib/analytics";
 import { ChartsClient } from "@/components/analytics/charts-client";
 import { InsightCard } from "@/components/analytics/insight-card";
+import { GuardrailIdentityCard } from "@/components/analytics/guardrail-identity-card";
+import { getGuardrailIdentity } from "@/lib/db/queries/guardrails";
 import dayjs from "dayjs";
 
 export const dynamic = "force-dynamic";
@@ -105,6 +107,8 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
     getHoldings(userId),
     getReviews(userId),
   ]);
+
+  const guardrailSnapshot = await getGuardrailIdentity(userId);
 
   const weekEnd = getWeekEnd(dayjs(weekStart)).valueOf();
   let currentReview = await getReviewByWeekStart(weekStart, userId);
@@ -199,6 +203,8 @@ async function DashboardContent({ weekStart }: { weekStart: number }) {
 
   return (
     <div className="space-y-6">
+      <GuardrailIdentityCard snapshot={guardrailSnapshot} />
+
       {/* Banners row */}
       <div className="space-y-2">
         {/* Week review reminder */}

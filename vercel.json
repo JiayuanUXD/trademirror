@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/sentiment/fetch",
+      "schedule": "30 7 * * 1-5"
+    },
+    {
+      "path": "/api/screener/scan",
+      "schedule": "35 7 * * 1-5"
+    }
+  ]
+}

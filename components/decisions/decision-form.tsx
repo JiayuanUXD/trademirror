@@ -9,6 +9,7 @@ import { StepIndicator } from "./step-indicator";
 import { ScorePicker } from "./score-picker";
 import { DangerDialog } from "./danger-dialog";
 import type { DangerAlert } from "@/app/api/decisions/pre-check/route";
+import type { GuardrailHit } from "@/lib/guardrails";
 import { step1Schema, step2Schema, step3Schema } from "@/lib/validators/decision";
 import {
   RATIONAL_BASIS,
@@ -73,6 +74,7 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingAlerts, setPendingAlerts] = useState<DangerAlert[] | null>(null);
+  const [pendingGuardrails, setPendingGuardrails] = useState<GuardrailHit[]>([]);
   const [watchlistBanner, setWatchlistBanner] = useState(false);
   const [parentId, setParentId] = useState<string | null>(null);
   const [recentStocks, setRecentStocks] = useState<Array<{ stockCode: string; stockName: string; stockMarket: "SH" | "SZ" | "BJ" }>>([]);
@@ -243,6 +245,11 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
           fomoScore: s2.fomoScore,
           calmScore: s2.calmScore,
           systemAlignment: s3.systemAlignment,
+          action: s1.action,
+          stockCode: s1.stockCode,
+          price: Number(s1.price) || 0,
+          quantity: Number(s1.quantity) || 0,
+          stopLossPrice: isSellAction ? 0 : Number(s3.stopLossPrice) || 0,
         }),
       });
       // 拦截失败不应阻断用户提交，仅记录后继续
@@ -251,11 +258,13 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
         await actuallySubmit();
         return;
       }
-      const data = (await res.json()) as { alerts: DangerAlert[] };
-      if (data.alerts.length === 0) {
+      const data = (await res.json()) as { alerts: DangerAlert[]; guardrails?: GuardrailHit[] };
+      const guardrails = data.guardrails ?? [];
+      if (data.alerts.length === 0 && guardrails.length === 0) {
         await actuallySubmit();
       } else {
         setPendingAlerts(data.alerts);
+        setPendingGuardrails(guardrails);
         setIsSubmitting(false);
       }
     } catch (err) {
@@ -282,6 +291,7 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
         fomoScore: s2.fomoScore,
         stopLossPrice: isSellAction ? 0 : Number(s3.stopLossPrice),
         systemAlignment: s3.systemAlignment,
+        guardrailOverride: pendingGuardrails.length > 0,
       };
       if (parentId) payload.parentId = parentId;
 
@@ -292,7 +302,13 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
       });
 
       if (!res.ok) {
-        const data = await res.json() as { error?: string };
+        const data = (await res.json()) as { error?: string; guardrails?: GuardrailHit[] };
+        if (data.error === "GUARDRAIL_BLOCKED" && data.guardrails?.length) {
+          setPendingAlerts([]);
+          setPendingGuardrails(data.guardrails);
+          setIsSubmitting(false);
+          return;
+        }
         throw new Error(data.error ?? "提交失败");
       }
 
@@ -305,6 +321,7 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
     } catch (err) {
       setErrors({ submit: err instanceof Error ? err.message : "提交失败，请重试" });
       setPendingAlerts(null);
+      setPendingGuardrails([]);
     } finally {
       setIsSubmitting(false);
     }
@@ -996,19 +1013,23 @@ export function DecisionForm({ initialValues, onSuccess }: DecisionFormProps = {
       </div>
 
       <DangerDialog
-        open={pendingAlerts !== null}
+        open={pendingAlerts !== null || pendingGuardrails.length > 0}
         alerts={pendingAlerts ?? []}
+        guardrails={pendingGuardrails}
         isSubmitting={isSubmitting}
         onCancel={() => {
           if (isSubmitting) return;
           setPendingAlerts(null);
+          setPendingGuardrails([]);
         }}
         onConfirm={() => {
           setPendingAlerts(null);
+          // 保留 pendingGuardrails 让 actuallySubmit 知道需要 override
           void actuallySubmit();
         }}
         onWatchlist={() => {
           setPendingAlerts(null);
+          setPendingGuardrails([]);
           setWatchlistBanner(true);
           // 滚到顶部让用户看到 banner
           window.scrollTo({ top: 0, behavior: "smooth" });

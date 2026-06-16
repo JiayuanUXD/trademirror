@@ -12,4 +12,6 @@ export async function saveSettingsAction(patch: Partial<Settings>) {
   await updateSettings(patch, userId);
   revalidatePath("/settings");
   revalidatePath("/");
+  revalidatePath("/sentiment");
+  revalidatePath("/screener");
 }

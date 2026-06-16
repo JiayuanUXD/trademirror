@@ -9,6 +9,41 @@
 
 ---
 
+## 2026-06-16
+
+### 月度画像 · 三笔关键交易
+
+- `monthly_portraits` 表增 `key_trades` JSON 列；schema + migrate 的 CREATE TABLE 与 ALTER TABLE 都补齐
+- `MonthlyPortrait` 类型扩 `keyTrades` 与 `keyTradeCandidates`；`KeyTradeItem` 含 decisionId / NEW|OLD / errorTypeId / 50 字旁注
+- 候选生成（`buildKeyTradeCandidates` in `lib/db/queries/portraits.ts`）：成功按 `return30Days` 倒排，失败按正排，反思按 FOMO×1.5 + 危险信号×2 + 体系不符 + 侥幸盈利综合分排序，各取 Top 5
+- `PATCH /api/portraits/[id]` zod schema 加 `keyTrades`；`updatePortrait` 持久化 JSON
+- 新建 `components/portraits/key-trade-section.tsx`：每槽展示 Top 3 候选 + 折叠更多，选中后跳决策详情链接、NEW/OLD 切换（OLD 弹老错误下拉关联 errorType）、50 字旁注
+- 详情页拉 `getErrorTypes(userId)` 传 PortraitForm 作下拉源
+- 颜色严格按 A 股规范：成功用 `--color-up`（红）、失败用 `--color-down`（绿）、反思用 `--brand-warning`（橙）
+
+### 阶段判定阈值可配 + 选股池历史
+
+- `settings` 表加 8 列阈值（`thr_main_rise_*` / `thr_ebb_limit_down` / `thr_ice_*` / `thr_ferment_*`），全部走 ALTER TABLE 兼容
+- `lib/sentiment/stage.ts` 引入 `StageThresholds` 与 `thresholdsFromSettings()`；`computeStage(today, yesterday, caps, thresholds)` 全面取消硬编码，触发文案动态引用阈值
+- `getLatestState(caps?, thresholds?)`：传阈值时以最新指标重算阶段；情绪页 / `/api/sentiment` GET+POST / `/api/screener/scan` 都改为 `thresholdsFromSettings(userSettings)` 后透传
+- 设置页加"阶段判定阈值（高级）"Section，按主升 / 退潮 / 冰点 / 发酵分子段
+- `/screener` 改用 `getHistoryWithCandidates(userId, 14)`，新建 `components/screener/history-timeline.tsx` 展示过去 14 日的阶段标签 + 闸门尺寸 + 候选名单 + T+1/3/5 收益（红涨绿跌）
+
+### 模块四 · 总仓位护栏对齐持仓档案
+
+- `lib/guardrails.ts` 总仓位口径从"按决策卡累加"改为"按持仓档案合计"——`getHoldingsTotalCost(userId)` 仅计 HOLDING 状态的 `costPrice * shares`
+- `getStagePositionCap(settingsRow)` 取代旧 `getLatestPositionCap`，先 `capsFromSettings + thresholdsFromSettings`，再走 `getLatestState` 拿当日阶段 cap
+- OVER_TOTAL_POS 文案改为"本笔后总仓位约 X%（按持仓档案合计）"，避免与决策卡累加不一致引起误读
+- 触发后仍走二次确认弹窗（非 BLOCK），所有事件落 `guardrail_events`
+
+### 选股池漏斗 UI 兼容性修复
+
+- 现象：`/screener` 报 "Cannot read properties of undefined (reading 'toLocaleString')"
+- 根因：技术拒马层后加，老 snapshot 的 `filtered_summary` JSON 没有 `afterTechnicalProbe` / `afterTrendFilter`
+- `pool-card.tsx` 把这两个字段标记为 optional，`FunnelStep` 在 value==null 时返回 null，prev 通过 `??` 链向下兼容
+
+---
+
 ## 2026-06-09
 
 ### 决策卡抽屉模式（持仓库 + 决策卡页）

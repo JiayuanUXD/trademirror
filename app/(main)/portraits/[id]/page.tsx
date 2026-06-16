@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, AlertTriangle, Target } from "lucide-react";
 import { auth } from "@/auth";
 import { getPortraitById } from "@/lib/db/queries/portraits";
+import { getErrorTypes } from "@/lib/db/queries/errors";
 import { PortraitForm } from "@/components/portraits/portrait-form";
 import { PROBLEM_DEFINITIONS } from "@/types/portrait";
 
@@ -32,6 +33,9 @@ export default async function PortraitDetailPage({ params }: Props) {
   const { id } = await params;
   const portrait = await getPortraitById(id, userId);
   if (!portrait) notFound();
+
+  const errorTypeRows = await getErrorTypes(userId);
+  const errorTypes = errorTypeRows.map((e) => ({ id: e.id, name: e.name }));
 
   const fomoColor = portrait.fomoAvg >= 7
     ? "var(--brand-red)"
@@ -153,7 +157,7 @@ export default async function PortraitDetailPage({ params }: Props) {
         className="rounded-xl border p-5"
         style={{ backgroundColor: "var(--surface-card)", borderColor: "var(--border-subtle)" }}
       >
-        <PortraitForm portrait={portrait} />
+        <PortraitForm portrait={portrait} errorTypes={errorTypes} />
       </div>
     </div>
   );

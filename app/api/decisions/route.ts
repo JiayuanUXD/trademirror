@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { createDecisionSchema } from "@/lib/validators/decision";
 import { createDecision, getDecisions, getDecisionsByStockCode } from "@/lib/db/queries/decisions";
 import { calcDangerSignals } from "@/lib/danger-signals";
-import type { DecisionStatus } from "@/types/decision";
+import { checkGuardrails, logGuardrailEvent } from "@/lib/guardrails";
 
 async function getUserId(): Promise<string | null> {
   const session = await auth();
@@ -58,6 +58,34 @@ export async function POST(req: NextRequest) {
       ? 0
       : Math.round(Math.abs(data.price - data.stopLossPrice) * data.quantity * 100) / 100;
 
+    // 服务端护栏校验：blocking 命中直接拒绝（前端可能被绕过）
+    const guardrails = await checkGuardrails({
+      userId,
+      action: data.action,
+      stockCode: data.stockCode,
+      price: data.price,
+      quantity: data.quantity,
+      stopLossPrice: isSellAction ? 0 : data.stopLossPrice,
+    });
+    const rawBodyForOverride = body as Record<string, unknown>;
+    const overrideAck = rawBodyForOverride.guardrailOverride === true;
+    const blocking = guardrails.filter((g) => g.blocking);
+    const warnings = guardrails.filter((g) => !g.blocking);
+
+    if (blocking.length > 0) {
+      for (const hit of blocking) {
+        await logGuardrailEvent(userId, hit, "BLOCKED", null, {
+          stockCode: data.stockCode,
+          quantity: data.quantity,
+          price: data.price,
+        });
+      }
+      return NextResponse.json(
+        { error: "GUARDRAIL_BLOCKED", guardrails: blocking },
+        { status: 422 }
+      );
+    }
+
     const dangerSignals = calcDangerSignals({
       fomoScore: data.fomoScore,
       calmScore: data.calmScore,
@@ -89,6 +117,16 @@ export async function POST(req: NextRequest) {
       tradedAt: data.tradedAt ?? null,
       createdAt: Date.now(),
     }, userId);
+
+    if (warnings.length > 0) {
+      for (const hit of warnings) {
+        await logGuardrailEvent(userId, hit, overrideAck ? "OVERRIDDEN" : "WARNED", decision.id, {
+          stockCode: data.stockCode,
+          quantity: data.quantity,
+          price: data.price,
+        });
+      }
+    }
 
     return NextResponse.json(decision, { status: 201 });
   } catch (err) {

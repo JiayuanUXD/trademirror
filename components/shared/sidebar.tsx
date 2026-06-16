@@ -12,6 +12,8 @@ import {
   Target,
   Settings,
   Bell,
+  Activity,
+  Filter,
   Users,
   BarChart3,
 } from "lucide-react";
@@ -31,6 +33,16 @@ const navItems: NavItem[] = [
     label: "仪表板",
     href: "/",
     icon: <LayoutDashboard size={15} />,
+  },
+  {
+    label: "市场情绪",
+    href: "/sentiment",
+    icon: <Activity size={15} />,
+  },
+  {
+    label: "选股漏斗",
+    href: "/screener",
+    icon: <Filter size={15} />,
   },
   {
     label: "回顾日历",

@@ -7,11 +7,18 @@ import {
   getMostRecentDecision,
   getNotAlignThisMonth,
 } from "@/lib/db/queries/danger-stats";
+import { checkGuardrails, type GuardrailHit } from "@/lib/guardrails";
 
 const preCheckSchema = z.object({
   fomoScore: z.number().min(1).max(10),
   calmScore: z.number().min(1).max(10),
   systemAlignment: z.enum(["ALIGN", "PARTIAL", "NOT_ALIGN"]),
+  // 护栏所需上下文（可选：传则跑护栏）
+  action: z.enum(["BUY", "ADD", "SELL", "REDUCE", "CLEAR"]).optional(),
+  stockCode: z.string().optional(),
+  price: z.number().nonnegative().optional(),
+  quantity: z.number().int().nonnegative().optional(),
+  stopLossPrice: z.number().nonnegative().optional(),
 });
 
 export type DangerAlertSignal =
@@ -97,7 +104,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ alerts });
+    // 行为护栏（PRD 模块四）：只在传入开仓上下文时跑
+    let guardrails: GuardrailHit[] = [];
+    if (parsed.data.action && parsed.data.stockCode && parsed.data.price != null && parsed.data.quantity != null) {
+      guardrails = await checkGuardrails({
+        userId,
+        action: parsed.data.action,
+        stockCode: parsed.data.stockCode,
+        price: parsed.data.price,
+        quantity: parsed.data.quantity,
+        stopLossPrice: parsed.data.stopLossPrice ?? 0,
+      });
+    }
+
+    return NextResponse.json({ alerts, guardrails });
   } catch (err) {
     console.error("[POST /api/decisions/pre-check]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

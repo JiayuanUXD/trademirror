@@ -27,6 +27,38 @@ export const NEXT_FOCUS_OPTIONS: { id: ProblemId; label: string }[] = PROBLEM_ID
 
 export type ProblemEvalItem = { id: ProblemId; eval: ProblemEval };
 
+export type KeyTradeKind = "SUCCESS" | "FAILURE" | "REFLECT";
+
+// 月度三笔关键交易：成功 / 失败 / 反思
+// 反思 = 结果好但过程糟，例如 FOMO 重却赌赢了
+export type KeyTradeItem = {
+  decisionId: string;
+  errorClassification: "NEW" | "OLD" | "";  // OLD 时关联 errorTypeId
+  errorTypeId?: string | null;
+  note: string;                              // ≤50 字
+};
+
+export type KeyTrades = {
+  success?: KeyTradeItem;
+  failure?: KeyTradeItem;
+  reflect?: KeyTradeItem;
+};
+
+export type KeyTradeCandidate = {
+  decisionId: string;
+  stockCode: string;
+  stockName: string;
+  action: string;
+  price: number;
+  return30Days: number | null;
+  fomoScore: number;
+  calmScore: number;
+  systemAlignment: string;
+  dangerSignalCount: number;
+  tradedAt: number | null;
+  createdAt: number;
+};
+
 export type MonthlyPortrait = {
   id: string;
   year: number;
@@ -35,6 +67,7 @@ export type MonthlyPortrait = {
   reflection: string;
   nextFocus: ProblemId | "";
   problemEvals: ProblemEvalItem[];
+  keyTrades: KeyTrades;
   createdAt: number;
   completedAt: number | null;
   // computed — not stored
@@ -45,4 +78,10 @@ export type MonthlyPortrait = {
   irrationalPct: number;
   avgDiscipline: number;
   emotionalCount: number;
+  // 系统给的三笔候选
+  keyTradeCandidates: {
+    success: KeyTradeCandidate[];
+    failure: KeyTradeCandidate[];
+    reflect: KeyTradeCandidate[];
+  };
 };

@@ -6,6 +6,19 @@ import { z } from "zod";
 import { PROBLEM_IDS } from "@/types/portrait";
 import type { ProblemEvalItem } from "@/types/portrait";
 
+const keyTradeItemSchema = z.object({
+  decisionId: z.string().min(1),
+  errorClassification: z.enum(["NEW", "OLD", ""]),
+  errorTypeId: z.string().nullable().optional(),
+  note: z.string().max(50).default(""),
+});
+
+const keyTradesSchema = z.object({
+  success: keyTradeItemSchema.optional(),
+  failure: keyTradeItemSchema.optional(),
+  reflect: keyTradeItemSchema.optional(),
+});
+
 const patchSchema = z.object({
   reflection: z.string().max(500).optional(),
   nextFocus: z.string().optional(),
@@ -17,6 +30,7 @@ const patchSchema = z.object({
       })
     )
     .optional(),
+  keyTrades: keyTradesSchema.optional(),
   complete: z.boolean().optional(),
 });
 

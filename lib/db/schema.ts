@@ -98,6 +98,7 @@ export const monthlyPortraits = sqliteTable("monthly_portraits", {
   reflection: text("reflection").notNull().default(""),
   nextFocus: text("next_focus").notNull().default(""),
   problemEvals: text("problem_evals").notNull().default("[]"),
+  keyTrades: text("key_trades").notNull().default("{}"),
   createdAt: integer("created_at").notNull(),
   completedAt: integer("completed_at"),
   userId: text("user_id").notNull(),
@@ -211,5 +212,103 @@ export const settings = sqliteTable("settings", {
   weeklyTradeLimit: integer("weekly_trade_limit").notNull().default(2),
   defaultStopLossPct: integer("default_stop_loss_pct").notNull().default(10),
   totalCapital: real("total_capital").notNull().default(0),
+  dailyOpenLimit: integer("daily_open_limit").notNull().default(2),
+  // 5 个阶段对应的总仓位上限，0~1。默认值与 lib/sentiment/stage.ts 的 POSITION_CAP 一致
+  capIce: real("cap_ice").notNull().default(0.20),
+  capRepair: real("cap_repair").notNull().default(0.50),
+  capFerment: real("cap_ferment").notNull().default(0.80),
+  capMainRise: real("cap_main_rise").notNull().default(1.00),
+  capEbb: real("cap_ebb").notNull().default(0.30),
+  // 阶段判定阈值（默认值与 lib/sentiment/stage.ts 的硬编码一致）
+  thrMainRiseLimitUp: integer("thr_main_rise_limit_up").notNull().default(80),
+  thrMainRiseSealRate: real("thr_main_rise_seal_rate").notNull().default(0.70),
+  thrMainRiseMaxBoards: integer("thr_main_rise_max_boards").notNull().default(5),
+  thrEbbLimitDown: integer("thr_ebb_limit_down").notNull().default(30),
+  thrIceLimitUp: integer("thr_ice_limit_up").notNull().default(30),
+  thrIceMaxBoards: integer("thr_ice_max_boards").notNull().default(2),
+  thrFermentLimitUp: integer("thr_ferment_limit_up").notNull().default(50),
+  thrFermentMaxBoards: integer("thr_ferment_max_boards").notNull().default(4),
+  // 选股漏斗 · 流动性过滤参数（per user）
+  minTurnoverYi: real("min_turnover_yi").notNull().default(1.0),
+  minTurnoverRatePct: real("min_turnover_rate_pct").notNull().default(3.0),
+  maxTurnoverRatePct: real("max_turnover_rate_pct").notNull().default(25.0),
+  minPrice: real("min_price").notNull().default(3),
+  maxPrice: real("max_price").notNull().default(200),
+  excludeSt: integer("exclude_st", { mode: "boolean" }).notNull().default(true),
+  excludeNew: integer("exclude_new", { mode: "boolean" }).notNull().default(true),
+  maxPoolSize: integer("max_pool_size").notNull().default(8),
   userId: text("user_id").notNull(),
+});
+
+// ─── 交易系统养成模块（PRD-交易系统养成模块） ───────────────────────────────
+
+// 市场级：每日情绪指标快照（全局共享，无 userId）
+export const marketSentimentDaily = sqliteTable("market_sentiment_daily", {
+  tradeDate: text("trade_date").primaryKey(),         // YYYY-MM-DD
+  limitUpCount: integer("limit_up_count"),            // 涨停家数
+  limitDownCount: integer("limit_down_count"),        // 跌停家数
+  sealRate: real("seal_rate"),                        // 封板率 0~1
+  maxConsecBoards: integer("max_consec_boards"),      // 最高连板高度
+  turnoverYi: real("turnover_yi"),                    // 两市成交额（亿）
+  prevLimitPremium: real("prev_limit_premium"),       // 昨涨停今日溢价 %
+  rawPayload: text("raw_payload"),                    // 原始抓取 JSON 备查
+  createdAt: integer("created_at").notNull(),
+});
+
+// 市场级：每日阶段结论（全局共享）
+export const dailyMarketState = sqliteTable("daily_market_state", {
+  tradeDate: text("trade_date").primaryKey(),
+  stage: text("stage").$type<"ICE" | "REPAIR" | "FERMENT" | "MAIN_RISE" | "EBB">().notNull(),
+  positionCap: real("position_cap").notNull(),       // 0~1，联动总仓位上限
+  triggerSnapshot: text("trigger_snapshot").notNull(),// 触发该结论的指标 JSON
+  createdAt: integer("created_at").notNull(),
+});
+
+// 用户级：选股漏斗每次扫描快照
+export const screenerPoolSnapshot = sqliteTable("screener_pool_snapshot", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tradeDate: text("trade_date").notNull(),            // YYYY-MM-DD
+  runAt: integer("run_at").notNull(),                 // epoch ms
+  stageAtRun: text("stage_at_run").$type<"ICE" | "REPAIR" | "FERMENT" | "MAIN_RISE" | "EBB">().notNull(),
+  gateStatus: text("gate_status").$type<"OPEN" | "PAUSED" | "LIMITED">().notNull(),
+  gateMaxSize: integer("gate_max_size").notNull(),    // 0 = 暂停
+  poolSize: integer("pool_size").notNull(),           // 实际入池数
+  universeSize: integer("universe_size").notNull(),   // 扫描的全市场总数
+  filteredSummary: text("filtered_summary").notNull().default("{}"), // JSON：每层剔除多少
+  createdAt: integer("created_at").notNull(),
+});
+
+// 用户级：选股候选明细
+export const screenerCandidate = sqliteTable("screener_candidate", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  snapshotId: text("snapshot_id").notNull(),
+  symbol: text("symbol").notNull(),                   // 6 位代码
+  name: text("name").notNull(),
+  price: real("price").notNull(),
+  turnoverYi: real("turnover_yi").notNull(),          // 当日成交额（亿）
+  turnoverRatePct: real("turnover_rate_pct").notNull(),
+  volumeRatio: real("volume_ratio"),
+  amplitudePct: real("amplitude_pct"),
+  score: real("score").notNull().default(0.5),
+  reasonTags: text("reason_tags").notNull().default("[]"), // JSON 数组
+  retT1: real("ret_t1"),
+  retT3: real("ret_t3"),
+  retT5: real("ret_t5"),
+  filledAt: integer("filled_at"),
+  createdAt: integer("created_at").notNull(),
+});
+
+// 用户级：行为护栏触发日志
+export const guardrailEvents = sqliteTable("guardrail_events", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  eventType: text("event_type")
+    .$type<"ADD_TO_LOSS" | "OVER_SINGLE_POS" | "OVER_TOTAL_POS" | "OVER_DAILY_COUNT" | "MISSING_STOP">()
+    .notNull(),
+  decisionRef: text("decision_ref"),                  // 关联决策卡 id
+  payload: text("payload").notNull().default("{}"),   // JSON：触发上下文
+  outcome: text("outcome").$type<"BLOCKED" | "WARNED" | "OVERRIDDEN">().notNull(),
+  createdAt: integer("created_at").notNull(),
 });

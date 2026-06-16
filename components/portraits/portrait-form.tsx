@@ -2,11 +2,25 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, XCircle, Minus, Search, Target, MessageSquare } from "lucide-react";
-import type { MonthlyPortrait, ProblemEval, ProblemId, ProblemEvalItem } from "@/types/portrait";
+import { CheckCircle, XCircle, Minus, Search, Target, MessageSquare, Star, TrendingDown, Lightbulb } from "lucide-react";
+import type {
+  MonthlyPortrait,
+  ProblemEval,
+  ProblemId,
+  ProblemEvalItem,
+  KeyTradeKind,
+  KeyTradeItem,
+  KeyTrades,
+} from "@/types/portrait";
 import { PROBLEM_DEFINITIONS, PROBLEM_IDS, NEXT_FOCUS_OPTIONS } from "@/types/portrait";
+import { KeyTradeSection } from "./key-trade-section";
 
-type Props = { portrait: MonthlyPortrait };
+type ErrorTypeOption = { id: string; name: string };
+
+type Props = {
+  portrait: MonthlyPortrait;
+  errorTypes: ErrorTypeOption[];
+};
 
 const EVAL_OPTIONS: { value: ProblemEval; label: string; icon: React.ReactNode; color: string }[] = [
   { value: "IMPROVED",  label: "改善", icon: <CheckCircle size={13} />, color: "var(--brand-green)" },
@@ -14,7 +28,7 @@ const EVAL_OPTIONS: { value: ProblemEval; label: string; icon: React.ReactNode; 
   { value: "WORSENED",  label: "恶化", icon: <XCircle size={13} />,     color: "var(--brand-red)" },
 ];
 
-export function PortraitForm({ portrait: initial }: Props) {
+export function PortraitForm({ portrait: initial, errorTypes }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [portrait, setPortrait] = useState(initial);
@@ -43,6 +57,16 @@ export function PortraitForm({ portrait: initial }: Props) {
     patch({ problemEvals: next });
   }
 
+  function setKeyTrade(kind: KeyTradeKind, item: KeyTradeItem | null) {
+    if (locked) return;
+    const slot: keyof KeyTrades = kind === "SUCCESS" ? "success" : kind === "FAILURE" ? "failure" : "reflect";
+    const next: KeyTrades = { ...portrait.keyTrades };
+    if (item == null) delete next[slot];
+    else next[slot] = item;
+    setPortrait((p) => ({ ...p, keyTrades: next }));
+    patch({ keyTrades: next });
+  }
+
   async function handleComplete() {
     const errs: Record<string, string> = {};
     if (!portrait.reflection.trim()) errs.reflection = "请填写本月体悟";
@@ -65,6 +89,53 @@ export function PortraitForm({ portrait: initial }: Props) {
 
   return (
     <div className={`space-y-6 ${isPending ? "opacity-70 pointer-events-none" : ""}`}>
+
+      {/* Three key trades */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: "var(--foreground)" }}>
+          <Star size={16} className="text-brand-blue" /> 三笔关键交易
+        </h2>
+        <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          挑出本月最值钱的三笔——成功、失败、反思。把账单复盘成训练数据。
+        </p>
+
+        <KeyTradeSection
+          kind="SUCCESS"
+          title="最成功"
+          icon={<CheckCircle size={14} />}
+          accent="var(--color-up)"
+          hint="收益最高、过程也站得住的那笔"
+          candidates={portrait.keyTradeCandidates.success}
+          item={portrait.keyTrades.success}
+          errorTypes={errorTypes}
+          locked={locked}
+          onChange={(it) => setKeyTrade("SUCCESS", it)}
+        />
+        <KeyTradeSection
+          kind="FAILURE"
+          title="最失败"
+          icon={<TrendingDown size={14} />}
+          accent="var(--color-down)"
+          hint="代价最大、教训最直接的那笔"
+          candidates={portrait.keyTradeCandidates.failure}
+          item={portrait.keyTrades.failure}
+          errorTypes={errorTypes}
+          locked={locked}
+          onChange={(it) => setKeyTrade("FAILURE", it)}
+        />
+        <KeyTradeSection
+          kind="REFLECT"
+          title="最反思"
+          icon={<Lightbulb size={14} />}
+          accent="var(--brand-warning)"
+          hint="赢得侥幸 / 过程糟糕——这笔教会你的最多"
+          candidates={portrait.keyTradeCandidates.reflect}
+          item={portrait.keyTrades.reflect}
+          errorTypes={errorTypes}
+          locked={locked}
+          onChange={(it) => setKeyTrade("REFLECT", it)}
+        />
+      </div>
 
       {/* 6-problem evaluation */}
       <div className="space-y-3">

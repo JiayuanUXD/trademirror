@@ -117,7 +117,7 @@ export function Sidebar({ role }: { role: "admin" | "user" }) {
 
   return (
     <aside
-      className="flex flex-col h-full w-14 md:w-52 shrink-0 border-r transition-all"
+      className="hidden md:flex flex-col h-full md:w-52 shrink-0 border-r transition-all"
       style={{
         backgroundColor: "var(--surface-sidebar)",
         borderColor: "var(--border-subtle)",

@@ -33,9 +33,9 @@ export default async function GoalsPage() {
         <Link href="/goals/new"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
           style={{
-            backgroundColor: "rgba(99,102,241,0.12)",
-            color: "var(--brand-purple)",
-            border: "1px solid rgba(99,102,241,0.25)",
+            backgroundColor: "rgba(61,142,248,0.12)",
+            color: "var(--brand-blue)",
+            border: "1px solid rgba(61,142,248,0.25)",
           }}>
           <Plus size={12} />
           新建目标
@@ -54,7 +54,7 @@ export default async function GoalsPage() {
           </div>
           <Link href="/goals/new"
             className="px-4 py-2 rounded-lg text-xs font-medium"
-            style={{ backgroundColor: "rgba(99,102,241,0.15)", color: "var(--brand-purple)", border: "1px solid rgba(99,102,241,0.3)" }}>
+            style={{ backgroundColor: "rgba(61,142,248,0.15)", color: "var(--brand-blue)", border: "1px solid rgba(61,142,248,0.3)" }}>
             立即设定第一个目标
           </Link>
         </div>
@@ -125,7 +125,7 @@ function GoalCard({ goal }: { goal: Awaited<ReturnType<typeof getGoals>>[number]
           {/* Time progress bar */}
           <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--surface-overlay)" }}>
             <div className="h-full rounded-full"
-              style={{ width: `${timePct}%`, backgroundColor: "rgba(99,102,241,0.4)" }} />
+              style={{ width: `${timePct}%`, backgroundColor: "rgba(61,142,248,0.4)" }} />
           </div>
           {/* Achievement bar */}
           <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: "var(--surface-overlay)" }}>

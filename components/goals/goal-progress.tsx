@@ -179,9 +179,9 @@ export function GoalProgress({ goal }: Props) {
             <button type="button" onClick={() => setShowCheckin(true)}
               className="w-full py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors"
               style={{
-                backgroundColor: "rgba(99,102,241,0.12)",
-                color: "var(--brand-purple)",
-                border: "1px solid rgba(99,102,241,0.25)",
+                backgroundColor: "rgba(61,142,248,0.12)",
+                color: "var(--brand-blue)",
+                border: "1px solid rgba(61,142,248,0.25)",
               }}>
               <PlusCircle size={14} />
               更新当前账户金额
@@ -203,7 +203,7 @@ export function GoalProgress({ goal }: Props) {
               <div className="flex gap-2">
                 <button type="button" onClick={handleCheckin} disabled={saving}
                   className="flex-1 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                  style={{ backgroundColor: "rgba(99,102,241,0.15)", color: "var(--brand-purple)", border: "1px solid rgba(99,102,241,0.3)" }}>
+                  style={{ backgroundColor: "rgba(61,142,248,0.15)", color: "var(--brand-blue)", border: "1px solid rgba(61,142,248,0.3)" }}>
                   {saving ? "保存中…" : "确认"}
                 </button>
                 <button type="button" onClick={() => setShowCheckin(false)}

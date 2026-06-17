@@ -108,9 +108,9 @@ export function GoalWizard() {
                 onClick={() => setYears(String(n))}
                 className="flex-1 py-2 rounded-lg text-xs font-medium transition-colors"
                 style={{
-                  backgroundColor: y === n ? "rgba(99,102,241,0.15)" : "var(--surface-overlay)",
-                  color: y === n ? "var(--brand-purple)" : "var(--muted-foreground)",
-                  border: `1px solid ${y === n ? "rgba(99,102,241,0.3)" : "var(--border-subtle)"}`,
+                  backgroundColor: y === n ? "rgba(61,142,248,0.15)" : "var(--surface-overlay)",
+                  color: y === n ? "var(--brand-blue)" : "var(--muted-foreground)",
+                  border: `1px solid ${y === n ? "rgba(61,142,248,0.3)" : "var(--border-subtle)"}`,
                 }}>
                 {n} 年
               </button>
@@ -232,9 +232,9 @@ export function GoalWizard() {
             disabled={saving || (isHighRisk && !confirmed)}
             className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
             style={{
-              backgroundColor: "rgba(99,102,241,0.15)",
-              color: "var(--brand-purple)",
-              border: "1px solid rgba(99,102,241,0.3)",
+              backgroundColor: "rgba(61,142,248,0.15)",
+              color: "var(--brand-blue)",
+              border: "1px solid rgba(61,142,248,0.3)",
             }}>
             <CheckCircle size={14} />
             {saving ? "创建中…" : "确认设定目标"}

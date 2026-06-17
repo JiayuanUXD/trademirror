@@ -48,7 +48,7 @@ export default async function DigestDetailPage({ params }: Props) {
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold" style={{ color: "var(--foreground)" }}>
+          <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>
             盘后简报 · {dateStr}（周{weekDay}）
           </h1>
           <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>

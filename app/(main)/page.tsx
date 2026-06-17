@@ -44,7 +44,7 @@ export default function HomePage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
             {getGreeting()}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>

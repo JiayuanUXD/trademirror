@@ -19,7 +19,7 @@ export default async function DecisionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>决策卡</h1>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>决策卡</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
             {decisions.length > 0 ? `共 ${decisions.length} 笔记录` : "在下单前记录你的思考"}
           </p>

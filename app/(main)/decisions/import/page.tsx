@@ -17,7 +17,7 @@ export default function ImportPage() {
           <ChevronLeft size={18} />
         </Link>
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
             <FileUp className="text-[var(--brand-blue)]" size={20} />
             导入决策数据
           </h1>

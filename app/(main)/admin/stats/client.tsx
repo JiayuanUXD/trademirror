@@ -20,7 +20,7 @@ export function AdminStatsClient({ stats }: { stats: AdminStats }) {
   return (
     <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>
           全局统计
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>

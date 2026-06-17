@@ -43,7 +43,7 @@ export default function LoginPage() {
         >
           T
         </div>
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+        <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
           登录 TradeMirror
         </h1>
         <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>

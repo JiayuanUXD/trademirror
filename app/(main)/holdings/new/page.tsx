@@ -15,7 +15,7 @@ export default function NewHoldingPage() {
       </Link>
 
       <div className="mb-6">
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>新建持仓档案</h1>
+        <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>新建持仓档案</h1>
         <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
           为这只股票建立逻辑档案，让每一笔持仓都有据可查
         </p>

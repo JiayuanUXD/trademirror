@@ -25,7 +25,7 @@ export default async function GoalsPage() {
     <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>目标管理</h1>
+          <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>目标管理</h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
             设定合理的目标，让数字帮你保持清醒
           </p>

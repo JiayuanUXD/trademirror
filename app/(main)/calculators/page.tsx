@@ -35,7 +35,7 @@ export default function CalculatorsPage() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>计算器套件</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>计算器套件</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
           数字化你的每一个决策，让直觉让位于计算
         </p>

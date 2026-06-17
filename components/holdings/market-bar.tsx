@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, createContext, useContext } from "react";
+import { useState, useEffect, useMemo, useRef, createContext, useContext } from "react";
 import Link from "next/link";
 import { Loader2, RefreshCw, FileText } from "lucide-react";
 import type { TechnicalResult, SignalSummary } from "@/lib/technical/types";
 import { summarize } from "@/lib/technical/signals";
+import type { MarketIndexResponse } from "@/app/api/market/index/route";
 
 // ─── Digest Context ─────────────────────────────────────────────────────────
 
@@ -29,14 +30,16 @@ export function useDigestSignals() {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type MarketIndex = { close: number; pctChg: number } | null;
+type MarketIndex = { last: number; pctChg: number } | null;
 type MarketMap = { sh: MarketIndex; sz: MarketIndex; cy: MarketIndex };
 
 type DigestData = {
   tradeDate: string;
-  marketData: string;
   stockAnalyses: string;
 };
+
+const POLL_INTERVAL_MS = 30_000;
+const EMPTY_MARKET: MarketMap = { sh: null, sz: null, cy: null };
 
 // ─── Provider + MarketBar ───────────────────────────────────────────────────
 
@@ -50,6 +53,10 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
   const [data, setData] = useState<DigestData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [market, setMarket] = useState<MarketMap>(EMPTY_MARKET);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState(false);
+  const inFlightMarket = useRef(false);
 
   const fetchDigest = async (refresh = false) => {
     setLoading(true);
@@ -58,7 +65,6 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
       const url = refresh ? "/api/digest?refresh=1" : "/api/digest?mode=cached";
       const res = await fetch(url);
       if (res.status === 404 && !refresh) {
-        // 没有缓存，触发生成
         const genRes = await fetch("/api/digest");
         if (genRes.ok) setData(await genRes.json());
         else setError(true);
@@ -73,8 +79,61 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
     }
   };
 
+  const fetchMarket = async () => {
+    if (inFlightMarket.current) return;
+    inFlightMarket.current = true;
+    setMarketLoading(true);
+    try {
+      const res = await fetch("/api/market/index");
+      if (!res.ok) { setMarketError(true); return; }
+      const json = (await res.json()) as MarketIndexResponse;
+      const next: MarketMap = {
+        sh: json.sh ? { last: json.sh.last, pctChg: json.sh.pctChg } : null,
+        sz: json.sz ? { last: json.sz.last, pctChg: json.sz.pctChg } : null,
+        cy: json.cy ? { last: json.cy.last, pctChg: json.cy.pctChg } : null,
+      };
+      setMarket(next);
+      if (next.sh || next.sz || next.cy) setMarketError(false);
+    } catch {
+      setMarketError(true);
+    } finally {
+      setMarketLoading(false);
+      inFlightMarket.current = false;
+    }
+  };
+
   useEffect(() => {
     if (hasHolding) void fetchDigest(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHolding]);
+
+  useEffect(() => {
+    if (!hasHolding) return;
+    void fetchMarket();
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (timer) return;
+      timer = setInterval(() => { void fetchMarket(); }, POLL_INTERVAL_MS);
+    };
+    const stop = () => {
+      if (timer) { clearInterval(timer); timer = null; }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void fetchMarket();
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHolding]);
 
@@ -96,20 +155,16 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
     return { signals: map, tradeDate: data.tradeDate, loading };
   }, [data, loading]);
 
-  // 解析大盘
-  let market: MarketMap = { sh: null, sz: null, cy: null };
-  if (data) { try { market = JSON.parse(data.marketData); } catch { /* ignore */ } }
-
+  // 解析大盘 — 现在由 /api/market/index 实时驱动，digest.marketData 不再使用
   return (
     <DigestCtx.Provider value={ctxValue}>
-      {/* 只有有持仓时显示大盘条 */}
       {hasHolding && (
         <MarketBarUI
           market={market}
           tradeDate={data?.tradeDate ?? null}
-          loading={loading}
-          error={error}
-          onRefresh={() => void fetchDigest(true)}
+          loading={loading || marketLoading}
+          error={(error && !data) || (marketError && !market.sh && !market.sz && !market.cy)}
+          onRefresh={() => { void fetchDigest(true); void fetchMarket(); }}
         />
       )}
       {children}

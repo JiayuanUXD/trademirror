@@ -51,7 +51,7 @@ export default function RegisterPage() {
         >
           T
         </div>
-        <h1 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+        <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
           注册 TradeMirror
         </h1>
         <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>

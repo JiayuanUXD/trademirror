@@ -89,7 +89,7 @@ export function SettingsForm({ initialSettings }: { initialSettings: Settings })
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>设置</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>设置</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
           配置你的纪律规则，让系统替你守住底线
         </p>

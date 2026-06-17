@@ -35,7 +35,7 @@ export default async function ReviewsPage() {
   return (
     <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>复盘</h1>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>复盘</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
           每周日完成复盘，是进步最快的方式
         </p>

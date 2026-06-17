@@ -517,7 +517,7 @@ export function HoldingsList({ holdings, inferred }: Props) {
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>持仓库</h1>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>持仓库</h1>
           <p className="text-sm mt-0.5 flex items-center gap-2" style={{ color: "var(--muted-foreground)" }}>
             <span>{activeCount > 0 ? `${activeCount} 只持有/观察中` : "暂无持仓"}</span>
             {inferred.length > 0 && (

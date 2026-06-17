@@ -108,7 +108,7 @@ export default function CalendarPage() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
                 <CalendarIcon style={{ color: "var(--brand-blue)" }} size={20} />
                 回顾日历
               </h1>

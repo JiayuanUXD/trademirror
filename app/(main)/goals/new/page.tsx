@@ -12,7 +12,7 @@ export default function NewGoalPage() {
         目标列表
       </Link>
       <div>
-        <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>新建投资目标</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: "var(--foreground)" }}>新建投资目标</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
           系统会评估目标的可实现性，帮你设定合理预期
         </p>

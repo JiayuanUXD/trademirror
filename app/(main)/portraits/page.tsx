@@ -30,7 +30,7 @@ export default async function PortraitsPage() {
   return (
     <div className="px-4 py-5 sm:px-6 sm:py-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--foreground)" }}>月度画像</h1>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>月度画像</h1>
         <p className="text-sm mt-0.5" style={{ color: "var(--muted-foreground)" }}>
           每月一面镜子，看清真实的自己
         </p>

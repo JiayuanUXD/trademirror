@@ -75,7 +75,7 @@ export default function LoginPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 rounded-md text-sm outline-none"
+            className="w-full px-3 py-2.5 rounded-md text-sm outline-none min-h-[44px]"
             style={{ backgroundColor: "var(--surface-overlay)", color: "var(--foreground)", border: "1px solid var(--border-subtle)" }}
             placeholder="请输入邮箱"
           />
@@ -91,7 +91,7 @@ export default function LoginPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded-md text-sm outline-none"
+            className="w-full px-3 py-2.5 rounded-md text-sm outline-none min-h-[44px]"
             style={{ backgroundColor: "var(--surface-overlay)", color: "var(--foreground)", border: "1px solid var(--border-subtle)" }}
             placeholder="请输入密码"
           />
@@ -100,7 +100,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-50"
+          className="w-full py-2.5 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-50 min-h-[44px]"
           style={{ backgroundColor: "var(--brand-blue)" }}
         >
           {loading ? "登录中..." : "登录"}
@@ -109,7 +109,7 @@ export default function LoginPage() {
 
       <p className="text-sm text-center mt-6" style={{ color: "var(--muted-foreground)" }}>
         还没有账号？{" "}
-        <Link href="/register" style={{ color: "var(--brand-blue)" }}>注册</Link>
+        <Link href="/register" className="inline-block py-1 px-1" style={{ color: "var(--brand-blue)" }}>注册</Link>
       </p>
     </div>
   );

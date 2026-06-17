@@ -87,7 +87,7 @@ export default function RegisterPage() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 rounded-md text-sm outline-none transition-colors"
+            className="w-full px-3 py-2.5 rounded-md text-sm outline-none transition-colors min-h-[44px]"
             style={{
               backgroundColor: "var(--surface-overlay)",
               color: "var(--foreground)",
@@ -111,7 +111,7 @@ export default function RegisterPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 rounded-md text-sm outline-none transition-colors"
+            className="w-full px-3 py-2.5 rounded-md text-sm outline-none transition-colors min-h-[44px]"
             style={{
               backgroundColor: "var(--surface-overlay)",
               color: "var(--foreground)",
@@ -135,7 +135,7 @@ export default function RegisterPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded-md text-sm outline-none transition-colors"
+            className="w-full px-3 py-2.5 rounded-md text-sm outline-none transition-colors min-h-[44px]"
             style={{
               backgroundColor: "var(--surface-overlay)",
               color: "var(--foreground)",
@@ -151,7 +151,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-50"
+          className="w-full py-2.5 rounded-md text-sm font-medium text-white transition-opacity disabled:opacity-50 min-h-[44px]"
           style={{ backgroundColor: "var(--brand-blue)" }}
         >
           {loading ? "注册中..." : "注册"}
@@ -160,7 +160,7 @@ export default function RegisterPage() {
 
       <p className="text-sm text-center mt-6" style={{ color: "var(--muted-foreground)" }}>
         已有账号？{" "}
-        <Link href="/login" style={{ color: "var(--brand-blue)" }}>
+        <Link href="/login" className="inline-block py-1 px-1" style={{ color: "var(--brand-blue)" }}>
           登录
         </Link>
       </p>

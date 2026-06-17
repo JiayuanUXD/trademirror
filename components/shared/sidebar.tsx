@@ -137,7 +137,7 @@ export function Sidebar({ role }: { role: "admin" | "user" }) {
               <Link
                 href={item.href}
                 title={item.label}
-                className={`nav-item relative flex items-center gap-2.5 px-2.5 md:px-3 py-2 rounded-lg text-sm ${
+                className={`nav-item relative flex items-center gap-2.5 px-2.5 md:px-3 py-2.5 rounded-lg text-sm ${
                   isActive
                     ? "bg-[var(--sidebar-accent)] text-[var(--foreground)] shadow-[0_0_0_1px_rgba(61,142,248,0.2)]"
                     : "text-[var(--muted-foreground)] hover:bg-white/[0.05] hover:text-[var(--foreground)]"
@@ -202,7 +202,7 @@ export function Sidebar({ role }: { role: "admin" | "user" }) {
                   <Link
                     href={item.href}
                     title={item.label}
-                    className={`nav-item relative flex items-center gap-2.5 px-2.5 md:px-3 py-2 rounded-lg text-sm ${
+                    className={`nav-item relative flex items-center gap-2.5 px-2.5 md:px-3 py-2.5 rounded-lg text-sm ${
                       isActive
                         ? "bg-[var(--sidebar-accent)] text-[var(--foreground)] shadow-[0_0_0_1px_rgba(61,142,248,0.2)]"
                         : "text-[var(--muted-foreground)] hover:bg-white/[0.05] hover:text-[var(--foreground)]"

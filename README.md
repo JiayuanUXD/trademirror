@@ -53,7 +53,7 @@ GOOGLE_CLIENT_SECRET=your-client-secret
 DEEPSEEK_API_KEY=your-api-key
 ```
 
-初始管理员账号：`jiayuan@trademirror.local` / `admin123`（首次登录强制改密）
+初始管理员账号：`jiayuan@trademirror.local` 
 
 ## 项目结构
 

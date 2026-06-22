@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../index";
 import { screenerPoolSnapshot, screenerCandidate } from "../schema";
 import type { FunnelResult } from "@/lib/screener/funnel";
@@ -126,6 +126,22 @@ export async function createSnapshot(args: {
   const { userId, tradeDate, result } = args;
   const now = Date.now();
   const snapshotId = crypto.randomUUID();
+
+  // 同一交易日多次扫描只保留最后一次
+  const oldSnaps = await db
+    .select({ id: screenerPoolSnapshot.id })
+    .from(screenerPoolSnapshot)
+    .where(
+      and(
+        eq(screenerPoolSnapshot.userId, userId),
+        eq(screenerPoolSnapshot.tradeDate, tradeDate)
+      )
+    );
+  if (oldSnaps.length > 0) {
+    const oldIds = oldSnaps.map((s) => s.id);
+    await db.delete(screenerCandidate).where(inArray(screenerCandidate.snapshotId, oldIds));
+    await db.delete(screenerPoolSnapshot).where(inArray(screenerPoolSnapshot.id, oldIds));
+  }
 
   const snapshot: ScreenerSnapshot = {
     id: snapshotId,

@@ -1,4 +1,4 @@
-import { desc, eq, lt } from "drizzle-orm";
+import { desc, eq, gte, lt } from "drizzle-orm";
 import { db } from "../index";
 import { marketSentimentDaily, dailyMarketState } from "../schema";
 import {
@@ -189,6 +189,14 @@ export async function hasMetricsForDate(tradeDate: string): Promise<boolean> {
     .where(eq(marketSentimentDaily.tradeDate, tradeDate))
     .limit(1);
   return rows.length > 0;
+}
+
+export async function getExistingDatesFrom(sinceDate: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ tradeDate: marketSentimentDaily.tradeDate })
+    .from(marketSentimentDaily)
+    .where(gte(marketSentimentDaily.tradeDate, sinceDate));
+  return new Set(rows.map((r) => r.tradeDate));
 }
 
 export type StageHistoryRow = {

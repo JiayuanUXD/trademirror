@@ -14,7 +14,7 @@ import {
 import dayjs from "dayjs";
 import type { SentimentTrendRow } from "@/lib/db/queries/sentiment";
 
-type Props = { trend: SentimentTrendRow[] };
+type Props = { trend: SentimentTrendRow[]; rangeDays?: number };
 
 type Row = {
   date: string;
@@ -24,7 +24,7 @@ type Row = {
   最高连板: number;
 };
 
-export function TrendChart({ trend }: Props) {
+export function TrendChart({ trend, rangeDays = 14 }: Props) {
   if (trend.length === 0) {
     return (
       <div
@@ -47,8 +47,8 @@ export function TrendChart({ trend }: Props) {
   }));
 
   const lastIndex = data.length - 1;
-  const tickInterval = data.length <= 14 ? 0 : data.length <= 30 ? 1 : 4;
-  const showAllDots = data.length <= 30;
+  const tickInterval = rangeDays <= 14 ? 0 : rangeDays <= 30 ? 2 : 4;
+  const showAllDots = rangeDays <= 30;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -63,7 +63,7 @@ export function TrendChart({ trend }: Props) {
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={data} margin={{ top: 18, right: 24, left: -8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" tickMargin={4} />
             <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
             <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "var(--border-subtle)" }} />
             <ReferenceLine
@@ -104,7 +104,7 @@ export function TrendChart({ trend }: Props) {
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={data} margin={{ top: 18, right: 24, left: -8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" tickMargin={4} />
             <YAxis tick={{ fontSize: 11 }} domain={[0, 100]} stroke="var(--muted-foreground)" />
             <Tooltip contentStyle={tooltipStyle} formatter={(v) => `${v}%`} cursor={{ stroke: "var(--border-subtle)" }} />
             <ReferenceLine y={70} stroke="var(--brand-warning)" strokeDasharray="4 4" opacity={0.5} />
@@ -137,7 +137,7 @@ export function TrendChart({ trend }: Props) {
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={data} margin={{ top: 18, right: 24, left: -8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" tickMargin={4} />
             <YAxis tick={{ fontSize: 11 }} allowDecimals={false} stroke="var(--muted-foreground)" />
             <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "var(--border-subtle)" }} />
             <ReferenceLine y={2} stroke="var(--muted-foreground)" strokeDasharray="4 4" opacity={0.4} />
@@ -167,7 +167,7 @@ export function TrendChart({ trend }: Props) {
         <ResponsiveContainer width="100%" height={240}>
           <LineChart data={data} margin={{ top: 18, right: 24, left: -8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={tickInterval} stroke="var(--muted-foreground)" tickMargin={4} />
             <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
             <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "var(--border-subtle)" }} />
             <ReferenceLine y={30} stroke="var(--color-down)" strokeDasharray="4 4" opacity={0.5} />

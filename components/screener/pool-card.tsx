@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import dayjs from "dayjs";
@@ -8,19 +8,15 @@ import type { SnapshotWithCandidates } from "@/lib/db/queries/screener";
 import { GateBanner } from "./gate-banner";
 import { CandidateRow } from "./candidate-row";
 
-type FilteredSummary = {
-  universe: number;
-  afterPriceRange: number;
-  afterStFilter: number;
-  afterNewFilter: number;
-  afterTurnoverYi: number;
-  afterTurnoverRate: number;
-  afterTechnicalProbe?: number;
-  afterTrendFilter?: number;
-  afterGate: number;
-};
+import type { FunnelSummary } from "./strategy-info";
 
-export function PoolCard({ initial }: { initial: SnapshotWithCandidates | null }) {
+export function PoolCard({
+  initial,
+  onFunnelChange,
+}: {
+  initial: SnapshotWithCandidates | null;
+  onFunnelChange?: (f: FunnelSummary | null) => void;
+}) {
   const router = useRouter();
   const [data, setData] = useState<SnapshotWithCandidates | null>(initial);
   const [busy, setBusy] = useState(false);
@@ -76,12 +72,16 @@ export function PoolCard({ initial }: { initial: SnapshotWithCandidates | null }
   }
 
   const { snapshot, candidates } = data;
-  let summary: FilteredSummary | null = null;
+  let funnel: FunnelSummary | null = null;
   try {
-    summary = JSON.parse(snapshot.filteredSummary);
+    funnel = JSON.parse(snapshot.filteredSummary);
   } catch {
-    summary = null;
+    funnel = null;
   }
+
+  useEffect(() => {
+    onFunnelChange?.(funnel);
+  }, [snapshot.filteredSummary]);
 
   return (
     <div className="space-y-4">
@@ -139,56 +139,6 @@ export function PoolCard({ initial }: { initial: SnapshotWithCandidates | null }
         )}
       </div>
 
-      {summary && (
-        <div
-          className="card-surface rounded-xl border p-5"
-          style={{ borderColor: "var(--border-subtle)" }}
-        >
-          <h3
-            className="text-xs font-medium uppercase tracking-wider mb-3"
-            style={{ color: "var(--muted-foreground)" }}
-          >
-            过滤漏斗
-          </h3>
-          <div className="space-y-1.5 text-sm">
-            <FunnelStep label="全市场" value={summary.universe} />
-            <FunnelStep label="价格区间" value={summary.afterPriceRange} prev={summary.universe} />
-            <FunnelStep label="剔除 ST" value={summary.afterStFilter} prev={summary.afterPriceRange} />
-            <FunnelStep label="剔除新股" value={summary.afterNewFilter} prev={summary.afterStFilter} />
-            <FunnelStep label="成交额达标" value={summary.afterTurnoverYi} prev={summary.afterNewFilter} />
-            <FunnelStep label="换手率达标" value={summary.afterTurnoverRate} prev={summary.afterTurnoverYi} />
-            <FunnelStep label="进入日K体检" value={summary.afterTechnicalProbe} prev={summary.afterTurnoverRate} />
-            <FunnelStep
-              label="趋势未走坏"
-              value={summary.afterTrendFilter}
-              prev={summary.afterTechnicalProbe ?? summary.afterTurnoverRate}
-            />
-            <FunnelStep
-              label="闸门取顶"
-              value={summary.afterGate}
-              prev={summary.afterTrendFilter ?? summary.afterTechnicalProbe ?? summary.afterTurnoverRate}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FunnelStep({ label, value, prev }: { label: string; value: number | undefined; prev?: number }) {
-  if (value == null) return null;
-  const diff = prev != null ? prev - value : null;
-  return (
-    <div className="flex items-center justify-between">
-      <span style={{ color: "var(--muted-foreground)" }}>{label}</span>
-      <span className="tabular-nums" style={{ color: "var(--foreground)" }}>
-        {value.toLocaleString()}
-        {diff != null && diff > 0 && (
-          <span className="ml-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
-            (-{diff.toLocaleString()})
-          </span>
-        )}
-      </span>
     </div>
   );
 }

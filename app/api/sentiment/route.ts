@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     const [latest, trend, stageHistory] = await Promise.all([
       getLatestState(caps, thresholds),
       getSentimentTrend(days),
-      getStageHistory(30, caps),
+      getStageHistory(days, caps),
     ]);
     return NextResponse.json({ latest, trend, stageHistory });
   } catch (err) {

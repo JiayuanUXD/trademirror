@@ -9,17 +9,27 @@ import { screenerCandidate, screenerPoolSnapshot } from "@/lib/db/schema";
 import { fetchKLineBatch, type KLineBar } from "./kline";
 import { isTradingDay } from "@/lib/sentiment/trading-day";
 
-// 给定 YYYY-MM-DD 往后偏移 N 个交易日，返回目标日期 YYYY-MM-DD
+function utcDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function parseUTC(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
 function addTradingDays(startDate: string, n: number): string {
-  const d = new Date(startDate + "T00:00:00+08:00");
+  const direction = n > 0 ? 1 : -1;
+  const absN = Math.abs(n);
+  const d = parseUTC(startDate);
   let count = 0;
-  while (count < n) {
-    d.setDate(d.getDate() + 1);
-    const dash = d.toISOString().slice(0, 10);
-    const weekday = d.getDay();
+  while (count < absN) {
+    d.setUTCDate(d.getUTCDate() + direction);
+    const dash = utcDateStr(d);
+    const weekday = d.getUTCDay();
     if (isTradingDay(dash, weekday)) count++;
   }
-  return d.toISOString().slice(0, 10);
+  return utcDateStr(d);
 }
 
 // 从 K 线序列里找到指定日期（或之后最近的）的收盘价

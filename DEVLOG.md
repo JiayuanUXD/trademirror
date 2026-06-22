@@ -9,6 +9,41 @@
 
 ---
 
+## 2026-06-22
+
+### 选股漏斗 · 数据修复与自动化
+
+- 修复 `addTradingDays` 时区 bug：用 `Date.UTC` + `setUTCDate` 统一 UTC 计算，修复 T+1/T+3/T+5 收益全为 0% 的问题
+- 修复负 N 方向 bug（`Math.abs(n)` + direction），支持回溯交易日
+- 页面加载时自动调用 `runBackfill` 回填已到期的 T+N 收盘价
+- `createSnapshot` 同日多次扫描只保留最后一次（先删旧 snapshot + candidates 再插入）
+
+### 市场情绪 · 自动补齐与性能优化
+
+- 修复 `HOLIDAYS_2026` 误将 6/22（正常交易日）标记为假日
+- 新增 `backfillSentiment`：页面加载时自动检测并补齐最近 N 个交易日缺失数据
+- 新增 `/api/sentiment/backfill` POST 端点，客户端切换 30/60 日时触发更大范围补齐
+- `backfilledUp` 状态：已拉取过的范围不再重复调用补齐 API，消除切换时的冗余等待
+- 修复 `fetchEastmoneySentiment` 历史日期拉取：非当日跳过 Sina 实时接口（仅返回今日数据）
+- 修复 "Failed query" 间歇报错：`getExistingDatesFrom` 替代 N 次 `hasMetricsForDate` 串行查询，单次批量获取已有日期
+- 页面加载补齐改为 fire-and-forget，不阻塞页面渲染
+
+### 趋势图表 X 轴优化
+
+- `TrendChart` 接收 `rangeDays` prop，不同 tab 使用不同 tick 间隔（14 日=全显，30 日=每 3 个，60 日=每 5 个）
+- 添加 `tickMargin` 增加标签与轴线间距
+
+### 页面宽度自适应
+
+- 选股漏斗 / 市场情绪页面移除 `max-w-3xl` / `max-w-5xl` + `mx-auto`，改为自适应浏览器宽度
+
+### 选股漏斗 · 过滤漏斗精简
+
+- 移除独立的"过滤漏斗"卡片，将漏斗数据迁移至标题旁 info 弹窗
+- 新增 `ScreenerHeader` 客户端组件，统一管理 StrategyInfo 与 PoolCard 之间的漏斗状态
+
+---
+
 ## 2026-06-16
 
 ### 月度画像 · 三笔关键交易

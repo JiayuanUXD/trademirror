@@ -181,10 +181,12 @@ function previousDay(date: Date): Date {
 }
 
 export async function fetchEastmoneySentiment(targetDate?: Date): Promise<FetchedSentiment> {
-  const date = targetDate ?? shanghaiNow();
+  const now = shanghaiNow();
+  const date = targetDate ?? now;
   const dateInt = ymd(date);
   const dateDash = ymdDash(date);
   const prevDateInt = ymd(previousDay(date));
+  const isToday = dateDash === ymdDash(now);
 
   const base = "https://push2ex.eastmoney.com";
   const ut = "7eea3edcaed734bea9cbfc24409ed989";
@@ -192,12 +194,13 @@ export async function fetchEastmoneySentiment(targetDate?: Date): Promise<Fetche
   const dtUrl = `${base}/getTopicDTPool?ut=${ut}&dpt=wz.ztzt&Pageindex=0&pagesize=400&sort=fund%3Aasc&date=${dateInt}`;
   const zbUrl = `${base}/getTopicZBPool?ut=${ut}&dpt=wz.ztzt&Pageindex=0&pagesize=400&sort=fbt%3Aasc&date=${dateInt}`;
 
+  // 新浪 hq 只返回实时数据，历史日期无法拉取成交额和溢价率
   const [zt, dt, zb, turnoverYi, prevLimitPremium] = await Promise.all([
     fetchPool<ZTPoolItem>(ztUrl),
     fetchPool<unknown>(dtUrl),
     fetchPool<unknown>(zbUrl),
-    fetchTwoMarketTurnoverYi(),
-    fetchPrevLimitPremium(prevDateInt),
+    isToday ? fetchTwoMarketTurnoverYi() : Promise.resolve(null),
+    isToday ? fetchPrevLimitPremium(prevDateInt) : Promise.resolve(null),
   ]);
 
   if (zt.rc !== 0 || !zt.data) {

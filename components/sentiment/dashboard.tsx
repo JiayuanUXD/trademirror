@@ -36,6 +36,7 @@ export function SentimentDashboard({
   const [showForm, setShowForm] = useState(initialLatest === null);
   const [rangeDays, setRangeDays] = useState<RangeDays>(14);
   const [rangeLoading, setRangeLoading] = useState(false);
+  const [backfilledUp, setBackfilledUp] = useState<number>(14);
 
   async function refetch(days: RangeDays = rangeDays) {
     const res = await fetch(`/api/sentiment?days=${days}`, { cache: "no-store" });
@@ -55,6 +56,14 @@ export function SentimentDashboard({
     setRangeDays(days);
     setRangeLoading(true);
     try {
+      if (days > backfilledUp) {
+        await fetch("/api/sentiment/backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ days: days + 7 }),
+        }).catch(() => {});
+        setBackfilledUp(days);
+      }
       await refetch(days);
     } finally {
       setRangeLoading(false);
@@ -241,7 +250,7 @@ export function SentimentDashboard({
         />
       )}
 
-      <TrendChart trend={trend} />
+      <TrendChart trend={trend} rangeDays={rangeDays} />
 
       <GuardrailStatsCard stats={initialGuardrailStats} />
     </div>

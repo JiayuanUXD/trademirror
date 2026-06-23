@@ -48,7 +48,7 @@ const SYSTEM_PROMPT = `你是一个 A 股交易记录解析助手。
 - 不支持港股/美股，遇到非A股代码返回 confidence < 0.5
 - 数量单位是"股"，若图片显示为"手"则乘以 100`;
 
-type Provider = "openai" | "gemini" | "deepseek";
+type Provider = "kimi" | "openai" | "gemini" | "deepseek";
 
 type ApiFetch = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -132,7 +132,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Determine API provider — priority: VISION_API_KEY > OPENAI_API_KEY > GEMINI_API_KEY > DEEPSEEK_API_KEY
+  // Determine API provider — priority: KIMI > OPENAI/VISION > GEMINI > DEEPSEEK
+  const kimiKey = process.env.KIMI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
@@ -141,7 +142,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let provider: Provider;
   let apiKey: string;
 
-  if (visionKey ?? openaiKey) {
+  if (kimiKey) {
+    provider = "kimi";
+    apiKey = kimiKey;
+  } else if (visionKey ?? openaiKey) {
     provider = "openai";
     apiKey = (visionKey ?? openaiKey)!;
   } else if (geminiKey) {
@@ -152,22 +156,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     apiKey = deepseekKey;
   } else {
     return NextResponse.json(
-      { error: "未配置视觉 API Key。请在环境变量中设置 OPENAI_API_KEY、GEMINI_API_KEY 或 DEEPSEEK_API_KEY。" },
+      { error: "未配置视觉 API Key。请在环境变量中设置 KIMI_API_KEY、OPENAI_API_KEY、GEMINI_API_KEY 或 DEEPSEEK_API_KEY。" },
       { status: 503 }
     );
   }
 
-  const defaultUrl =
-    provider === "gemini"
-      ? "https://generativelanguage.googleapis.com/v1beta/models"
-      : provider === "openai"
-      ? "https://api.openai.com/v1/chat/completions"
-      : "https://api.deepseek.com/chat/completions";
-  const defaultModel =
-    provider === "gemini" ? "gemini-2.5-flash" : provider === "openai" ? "gpt-4o" : "deepseek-chat";
+  const DEFAULT_URLS: Record<Provider, string> = {
+    kimi: "https://api.moonshot.cn/v1/chat/completions",
+    openai: "https://api.openai.com/v1/chat/completions",
+    gemini: "https://generativelanguage.googleapis.com/v1beta/models",
+    deepseek: "https://api.deepseek.com/chat/completions",
+  };
+  const DEFAULT_MODELS: Record<Provider, string> = {
+    kimi: "kimi-2.7",
+    openai: "gpt-4o",
+    gemini: "gemini-2.5-flash",
+    deepseek: "deepseek-chat",
+  };
 
-  const apiUrl = process.env.VISION_API_URL ?? defaultUrl;
-  const model = process.env.VISION_MODEL ?? defaultModel;
+  const apiUrl = process.env.VISION_API_URL ?? DEFAULT_URLS[provider];
+  const model = process.env.VISION_MODEL ?? DEFAULT_MODELS[provider];
   console.log(`[vision] provider=${provider} model=${model}`);
 
   // Parse multipart form data

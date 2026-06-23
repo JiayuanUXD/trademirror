@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getOrGenerateDigest, generateDigestStream, regenerateDigest } from "@/lib/digest/generate";
 import { listRecentDigests, getDigestByDate } from "@/lib/db/queries/digests";
+import { getLastTradingDay } from "@/lib/technical/tushare";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // AI 生成可能需要较长时间
@@ -41,13 +42,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(digest);
   }
 
-  // 仅读缓存模式（不触发生成，不依赖 Tushare）
+  // 仅读缓存模式：命中最近交易日直接返回，否则返回最近可用+stale标记
   if (mode === "cached") {
-    const recent = await listRecentDigests(userId, 1);
-    if (recent.length === 0) {
-      return NextResponse.json({ error: "暂无缓存" }, { status: 404 });
+    let tradeDate: string | null = null;
+    try {
+      tradeDate = await getLastTradingDay();
+    } catch {
+      // Tushare 不可用，降级到最近缓存
     }
-    return NextResponse.json(recent[0]);
+    if (tradeDate) {
+      const todayDigest = await getDigestByDate(tradeDate, userId);
+      if (todayDigest) {
+        return NextResponse.json(todayDigest);
+      }
+    }
+    const recent = await listRecentDigests(userId, 1);
+    if (recent.length > 0) {
+      return NextResponse.json({ ...recent[0], stale: !tradeDate || recent[0].tradeDate !== tradeDate });
+    }
+    return NextResponse.json({ error: "暂无缓存" }, { status: 404 });
   }
 
   // 流式模式

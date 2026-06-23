@@ -47,3 +47,4 @@ local.db
 .gstack/
 .gstack-audit/
 skills-lock.json
+DEVLOG.md

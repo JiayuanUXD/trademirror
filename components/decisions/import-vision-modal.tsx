@@ -26,6 +26,8 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
   const [apiErrors, setApiErrors] = useState<{ imageIndex: number; reason: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCount, setCreatedCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
+  const [correctedList, setCorrectedList] = useState<{ stockName: string; oldCode: string; newCode: string }[]>([]);
   const [processError, setProcessError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -139,13 +141,20 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      const data = await res.json() as { created: unknown[]; failed: { index: number; reason: string }[] };
+      const data = await res.json() as { created: unknown[]; failed: { index: number; reason: string }[]; skipped?: number; message?: string; corrected?: { stockName: string; oldCode: string; newCode: string }[] };
       const created = data.created?.length ?? 0;
-      if (created === 0 && (data.failed?.length ?? 0) > 0) {
+      const dupSkipped = data.skipped ?? 0;
+      if (created === 0 && dupSkipped === 0 && (data.failed?.length ?? 0) > 0) {
         setProcessError(`创建失败：${data.failed[0]?.reason ?? "未知错误"}`);
         return;
       }
+      if (created === 0 && dupSkipped > 0) {
+        setProcessError(data.message ?? `${dupSkipped} 条记录与已有决策卡重复，已全部跳过`);
+        return;
+      }
       setCreatedCount(created);
+      setSkippedCount(dupSkipped);
+      setCorrectedList(data.corrected ?? []);
       setStep("done");
       router.refresh();
     } catch {
@@ -393,7 +402,19 @@ export function ImportVisionModal({ onClose }: { onClose: () => void }) {
                 <p className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
                   已创建 {createdCount} 张决策卡草稿
                 </p>
-                <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>
+                {skippedCount > 0 && (
+                <p className="text-sm mt-1" style={{ color: "var(--brand-warning)" }}>
+                  另有 {skippedCount} 条重复记录已自动跳过
+                </p>
+              )}
+              {correctedList.length > 0 && (
+                <div className="text-sm mt-1" style={{ color: "var(--brand-blue)" }}>
+                  {correctedList.map((c) => (
+                    <p key={c.oldCode}>已自动纠正：{c.stockName} {c.oldCode} → {c.newCode}</p>
+                  ))}
+                </div>
+              )}
+              <p className="text-sm mt-1.5" style={{ color: "var(--muted-foreground)" }}>
                   情绪评分、决策依据等字段尚未填写，请逐一补全
                 </p>
               </div>

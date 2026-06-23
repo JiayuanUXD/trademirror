@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef, createContext, useContext } from "react";
-import Link from "next/link";
-import { Loader2, RefreshCw, FileText } from "lucide-react";
+import { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } from "react";
+import { Loader2, RefreshCw, FileText, X } from "lucide-react";
 import type { TechnicalResult, SignalSummary } from "@/lib/technical/types";
 import { summarize } from "@/lib/technical/signals";
+import { DigestContent } from "@/components/holdings/digest-content";
+import { DigestShareButton } from "@/components/holdings/digest-share-button";
 import type { MarketIndexResponse } from "@/app/api/market/index/route";
 
 // ─── Digest Context ─────────────────────────────────────────────────────────
@@ -36,6 +37,8 @@ type MarketMap = { sh: MarketIndex; sz: MarketIndex; cy: MarketIndex };
 type DigestData = {
   tradeDate: string;
   stockAnalyses: string;
+  digestText?: string;
+  marketData?: string;
 };
 
 const POLL_INTERVAL_MS = 30_000;
@@ -71,7 +74,11 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
         return;
       }
       if (!res.ok) { setError(true); return; }
-      setData(await res.json());
+      const json = await res.json();
+      setData(json);
+      if (json.stale && !refresh) {
+        fetch("/api/digest").then(r => r.ok ? r.json() : null).then(d => { if (d) setData(d); }).catch(() => {});
+      }
     } catch {
       setError(true);
     } finally {
@@ -155,7 +162,19 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
     return { signals: map, tradeDate: data.tradeDate, loading };
   }, [data, loading]);
 
-  // 解析大盘 — 现在由 /api/market/index 实时驱动，digest.marketData 不再使用
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openDrawer = useCallback(() => {
+    if (!data?.tradeDate) return;
+    if (!data.digestText) {
+      fetch(`/api/digest?date=${data.tradeDate}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) setData(d); })
+        .catch(() => {});
+    }
+    setDrawerOpen(true);
+  }, [data]);
+
   return (
     <DigestCtx.Provider value={ctxValue}>
       {hasHolding && (
@@ -165,6 +184,16 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
           loading={loading || marketLoading}
           error={(error && !data) || (marketError && !market.sh && !market.sz && !market.cy)}
           onRefresh={() => { void fetchDigest(true); void fetchMarket(); }}
+          onOpenDigest={openDrawer}
+        />
+      )}
+      {drawerOpen && data?.tradeDate && (
+        <DigestDrawer
+          tradeDate={data.tradeDate}
+          digestText={data.digestText ?? null}
+          marketData={data.marketData ?? "{}"}
+          stockAnalyses={data.stockAnalyses}
+          onClose={() => setDrawerOpen(false)}
         />
       )}
       {children}
@@ -175,13 +204,14 @@ export function DigestProvider({ hasHolding, children }: { hasHolding: boolean; 
 // ─── MarketBar UI ───────────────────────────────────────────────────────────
 
 function MarketBarUI({
-  market, tradeDate, loading, error, onRefresh,
+  market, tradeDate, loading, error, onRefresh, onOpenDigest,
 }: {
   market: MarketMap;
   tradeDate: string | null;
   loading: boolean;
   error: boolean;
   onRefresh: () => void;
+  onOpenDigest: () => void;
 }) {
   const items: [string, MarketIndex][] = [
     ["上证", market.sh],
@@ -238,15 +268,110 @@ function MarketBarUI({
           <RefreshCw size={11} style={{ color: "var(--muted-foreground)" }} />
         </button>
         {tradeDate && (
-          <Link
-            href={`/holdings/digest/${tradeDate}`}
+          <button
+            type="button"
+            onClick={onOpenDigest}
             className="p-1 rounded hover:bg-[var(--surface-overlay)]"
             title="查看完整简报"
           >
             <FileText size={11} style={{ color: "var(--muted-foreground)" }} />
-          </Link>
+          </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Digest Drawer ─────────────────────────────────────────────────────────
+
+function DigestDrawer({
+  tradeDate, digestText, marketData, stockAnalyses, onClose,
+}: {
+  tradeDate: string;
+  digestText: string | null;
+  marketData: string;
+  stockAnalyses: string;
+  onClose: () => void;
+}) {
+  const dateStr = `${tradeDate.slice(0, 4)}-${tradeDate.slice(4, 6)}-${tradeDate.slice(6, 8)}`;
+  const weekDays = ["日", "一", "二", "三", "四", "五", "六"];
+  const dateObj = new Date(Number(tradeDate.slice(0, 4)), Number(tradeDate.slice(4, 6)) - 1, Number(tradeDate.slice(6, 8)));
+  const weekDay = weekDays[dateObj.getDay()];
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      {/* drawer panel */}
+      <div
+        className="relative w-full max-w-md h-full overflow-y-auto animate-slide-in-right"
+        style={{ backgroundColor: "var(--background)" }}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b" style={{ backgroundColor: "var(--background)", borderColor: "var(--border-subtle)" }}>
+          <div>
+            <h2 className="text-base font-bold" style={{ color: "var(--foreground)" }}>
+              盘后简报 · {dateStr}（周{weekDay}）
+            </h2>
+            <p className="text-[11px]" style={{ color: "var(--muted-foreground)" }}>
+              基于技术指标和公开信息自动生成
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <DigestShareButton tradeDate={tradeDate} />
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-[var(--surface-overlay)]"
+            >
+              <X size={16} style={{ color: "var(--muted-foreground)" }} />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-4 py-5 space-y-4">
+          {digestText ? (
+            <DigestContent
+              digestText={digestText}
+              marketData={marketData}
+              stockAnalyses={stockAnalyses}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 size={20} className="animate-spin" style={{ color: "var(--muted-foreground)" }} />
+              <span className="ml-2 text-sm" style={{ color: "var(--muted-foreground)" }}>加载简报中...</span>
+            </div>
+          )}
+
+          <div
+            className="rounded-lg p-3 text-[11px] leading-relaxed"
+            style={{ backgroundColor: "var(--surface-overlay)", color: "var(--muted-foreground)" }}
+          >
+            ⚠️ 以上分析基于技术指标和公开信息自动生成，仅供复盘参考，不构成任何投资建议。
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slide-in-right {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
+        }
+        .animate-slide-in-right {
+          animation: slide-in-right 0.25s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
